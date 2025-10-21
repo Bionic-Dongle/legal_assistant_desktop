@@ -1,0 +1,26 @@
+
+appId: com.legalassistant.app
+productName: Legal Assistant
+npmRebuild: false
+nodeGypRebuild: false
+forceCodeSigning: false
+win:
+  target:
+    - target: zip
+      arch:
+        - x64
+  icon: public/icon.png
+files:
+  - .next/**/*
+  - electron/**/*
+  - public/**/*
+  - data/**/*
+  - node_modules/**/*
+  - package.json
+directories:
+  buildResources: public
+extraResources:
+  - from: data
+    to: data
+    filter:
+      - "**/*"

@@ -1,0 +1,49 @@
+# Node.js / Next.js optimized .gitignore
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dependency directories
+node_modules/
+
+# Build output
+.next/
+out/
+dist/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# System files
+.DS_Store
+Thumbs.db
+
+# IDE specific
+.vscode/
+*.swp
+
+# Database and data storage
+data/**/*.db
+data/**/*.sqlite
+data/**/*.json
+
+# Electron build artifacts
+electron-build/
+release/
+*.asar
+
+# TypeScript
+*.tsbuildinfo
+
+# Miscellaneous
+coverage/
+*.tgz
+*.bak
