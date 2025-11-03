@@ -103,6 +103,70 @@ webPreferences: {
 - IPC handlers exposed via contextBridge in `preload.js`
 - Access in renderer: `window.electronAPI.getSetting(key)`, `window.electronAPI.setSetting(key, value)`, `window.electronAPI.getAppPath()`
 
+### Chat Management System
+
+**Overview**:
+The application features a complete chat session management system that allows users to save, load, archive, and manage multiple conversations entirely within the app interface.
+
+**Core Fixes & Configuration**:
+- Fixed Electron configuration by ensuring `contextIsolation: true` and `nodeIntegration: false` to restore React hydration
+- Removed auto-opening DevTools on launch for cleaner user experience
+
+**Save Chat Modal** (components/SaveChatModal.tsx):
+- Custom in-app modal replacing browser file dialogs
+- Features:
+  - Name input for chat title
+  - Description textarea for chat summary
+  - One-click silent saving to internal storage
+- All chats saved to `userData/chats/` with unique filenames
+- No OS dialogs required - fully integrated UI experience
+
+**Session Isolation**:
+- Each chat session carries a unique `sessionId`
+- Messages are saved and reloaded per session
+- Eliminates chat merging when reopening or switching between chats
+- Last opened chat session automatically loaded via `localStorage`
+
+**Chat Repository Tab** (components/ChatRepositoryTab.tsx):
+- Dedicated tab for browsing and managing stored conversations
+- Features:
+  - Display all saved chats with name, description, and metadata
+  - "Open Chat" button to load conversation directly into ChatTab
+  - "Archive" button to move chats to `userData/chats/archive/`
+  - "Copy JSON" for raw export (optional debugging)
+  - Search/filter functionality for finding specific chats
+- View updates dynamically after archiving or loading operations
+
+**ChatTab Enhancements** (components/ChatTab.tsx):
+- "Clear Chat" button for instant session reset
+- Seamless switching between chats while keeping other sessions intact
+- Automatically loads last opened chat on app start
+- Session state persisted independently per chat
+
+**IPC Bridge Implementation** (electron/preload.js):
+Secure IPC handlers exposed via contextBridge:
+- `window.electronAPI.saveChat(chatData)` - Save chat to userData/chats/
+- `window.electronAPI.getSavedChats()` - Retrieve list of all saved chats
+- `window.electronAPI.loadChat(filename)` - Load specific chat by filename
+- `window.electronAPI.archiveChat(filename)` - Move chat to archive folder
+
+**Storage Structure**:
+```
+userData/
+└── chats/
+    ├── chat-{timestamp}.json        # Active chats
+    ├── chat-{timestamp}.json
+    └── archive/
+        └── chat-{timestamp}.json    # Archived chats
+```
+
+**Key Benefits**:
+- No reliance on OS file dialogs - pure in-app experience
+- Complete session isolation prevents conversation mixing
+- Archive system for decluttering without deletion
+- All operations handled natively through Electron IPC
+- Maintains local-first, privacy-focused architecture
+
 ### Component Structure
 
 **Page Layout** (app/page.tsx):
