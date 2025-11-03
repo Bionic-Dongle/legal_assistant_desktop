@@ -1,33 +1,30 @@
+const { app, BrowserWindow, ipcMain } = require("electron");
+const path = require("path");
 
-const { app, BrowserWindow, ipcMain } = require('electron');
-const path = require('path');
-const isDev = require('electron-is-dev');
-const Store = require('electron-store');
-
-const store = new Store();
-
+let store;
 let mainWindow;
 let nextServer;
+let isDev;
 
 async function startNextServer() {
   if (!isDev) {
-    const next = require('next');
+    const next = require("next");
     const nextApp = next({
       dev: false,
-      dir: path.join(__dirname, '..'),
+      dir: path.join(__dirname, ".."),
     });
-    
+
     await nextApp.prepare();
     const handle = nextApp.getRequestHandler();
-    
-    const http = require('http');
+
+    const http = require("http");
     nextServer = http.createServer((req, res) => {
       handle(req, res);
     });
-    
+
     return new Promise((resolve) => {
-      nextServer.listen(3000, () => {
-        console.log('Next.js server started on port 3000');
+      nextServer.listen(3004, () => {
+        console.log("Next.js server started on port 3004");
         resolve();
       });
     });
@@ -35,6 +32,13 @@ async function startNextServer() {
 }
 
 async function createWindow() {
+  // Dynamically import ES modules
+  const electronIsDev = await import("electron-is-dev");
+  isDev = electronIsDev.default;
+
+  const ElectronStore = await import("electron-store");
+  store = new ElectronStore.default();
+
   if (!isDev) {
     await startNextServer();
   }
@@ -43,14 +47,14 @@ async function createWindow() {
     width: 1400,
     height: 900,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-      enableRemoteModule: true,
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, "preload.js"),
     },
-    icon: path.join(__dirname, '../public/icon.png'),
+    icon: path.join(__dirname, "../public/icon.png"),
   });
 
-  const startURL = 'http://localhost:3000';
+  const startURL = "http://localhost:3004";
 
   mainWindow.loadURL(startURL);
 
@@ -58,39 +62,39 @@ async function createWindow() {
     mainWindow.webContents.openDevTools();
   }
 
-  mainWindow.on('closed', () => {
+  mainWindow.on("closed", () => {
     mainWindow = null;
   });
 }
 
 // App lifecycle
-app.on('ready', createWindow);
+app.on("ready", createWindow);
 
-app.on('window-all-closed', () => {
+app.on("window-all-closed", () => {
   if (nextServer) {
     nextServer.close();
   }
-  if (process.platform !== 'darwin') {
+  if (process.platform !== "darwin") {
     app.quit();
   }
 });
 
-app.on('activate', () => {
+app.on("activate", () => {
   if (mainWindow === null) {
     createWindow();
   }
 });
 
 // IPC handlers for settings
-ipcMain.handle('get-setting', async (event, key) => {
+ipcMain.handle("get-setting", async (event, key) => {
   return store.get(key);
 });
 
-ipcMain.handle('set-setting', async (event, key, value) => {
+ipcMain.handle("set-setting", async (event, key, value) => {
   store.set(key, value);
   return true;
 });
 
-ipcMain.handle('get-app-path', async () => {
-  return app.getPath('userData');
+ipcMain.handle("get-app-path", async () => {
+  return app.getPath("userData");
 });
