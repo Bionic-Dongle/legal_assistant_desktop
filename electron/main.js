@@ -58,9 +58,7 @@ async function createWindow() {
 
   mainWindow.loadURL(startURL);
 
-  if (isDev) {
-    mainWindow.webContents.openDevTools();
-  }
+  // Developer tools no longer open automatically on launch
 
   mainWindow.on("closed", () => {
     mainWindow = null;
@@ -97,4 +95,65 @@ ipcMain.handle("set-setting", async (event, key, value) => {
 
 ipcMain.handle("get-app-path", async () => {
   return app.getPath("userData");
+});
+
+// Chat save/load handlers
+const fs = require("fs");
+const chatsDir = path.join(app.getPath("userData"), "chats");
+
+if (!fs.existsSync(chatsDir)) {
+  fs.mkdirSync(chatsDir, { recursive: true });
+}
+
+ipcMain.handle("save-chat", async (event, data) => {
+  try {
+    const fileName = data?.name
+      ? `${data.name.replace(/[^a-z0-9_-]/gi, "_")}.json`
+      : `chat_${Date.now()}.json`;
+    const filePath = path.join(chatsDir, fileName);
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+    return { success: true, path: filePath };
+  } catch (err) {
+    console.error("Failed to save chat", err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle("get-saved-chats", async () => {
+  try {
+    const files = fs.readdirSync(chatsDir).filter((f) => f.endsWith(".json"));
+    return files.map((name) => ({
+      name,
+      path: path.join(chatsDir, name),
+    }));
+  } catch (err) {
+    console.error("Failed to list chats", err);
+    return [];
+  }
+});
+
+ipcMain.handle("load-chat", async (event, filename) => {
+  try {
+    const fullPath = path.join(chatsDir, filename);
+    const content = fs.readFileSync(fullPath, "utf-8");
+    return JSON.parse(content);
+  } catch (err) {
+    console.error("Failed to load chat", err);
+    return null;
+  }
+});
+
+ipcMain.handle("archive-chat", async (event, filename) => {
+  try {
+    const archiveDir = path.join(chatsDir, "archive");
+    if (!fs.existsSync(archiveDir))
+      fs.mkdirSync(archiveDir, { recursive: true });
+    const sourcePath = path.join(chatsDir, filename);
+    const destPath = path.join(archiveDir, filename);
+    fs.renameSync(sourcePath, destPath);
+    return { success: true, path: destPath };
+  } catch (err) {
+    console.error("Failed to archive chat", err);
+    return { success: false, error: err.message };
+  }
 });

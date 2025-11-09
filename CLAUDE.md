@@ -72,14 +72,31 @@ Simple JSON-based keyword matching (not true embeddings):
 - `messages`: Chat conversation history (linked to case_id)
 - `evidence`: Uploaded files metadata with memory_type ('plaintiff'|'opposition')
 - `saved_insights`: Multi-purpose storage for insights/arguments/todos with category field
-- `narratives`: Case narrative summaries
+- `narratives`: Main and sub-narratives (narrative_type: 'main' | 'sub')
+- `plot_points`: Key moments in main narrative with content
 - `settings`: Key-value configuration store
+
+**Narrative Construction Architecture**:
+```
+Main Narrative (one per case, auto-created)
+  └─ Plot Points (key moments/events)
+      ├─ Direct content (TipTap rich text)
+      └─ Sub-Narratives (optional deep dives)
+          └─ Content for detailed exploration
+```
+
+**Key Relationships**:
+- Each case has exactly ONE main narrative (auto-created on initialization)
+- Main narrative contains multiple plot points (structural backbone)
+- Sub-narratives attach to specific plot points via `plot_point_id`
+- Not all plot points require sub-narratives
+- But all sub-narratives must belong to a plot point
 
 **Important Patterns**:
 - All tables use TEXT PRIMARY KEY with timestamp-based IDs (e.g., `msg-${Date.now()}-user`)
 - Foreign keys cascade delete on case removal
 - Indexes on all case_id foreign keys for performance
-- Default case created on first run if none exists
+- Default case AND main narrative created on first run if none exists
 
 ### Electron Integration (electron/main.js)
 
@@ -167,16 +184,123 @@ userData/
 - All operations handled natively through Electron IPC
 - Maintains local-first, privacy-focused architecture
 
+### Narrative Construction System (Phase 1a - COMPLETED)
+
+**Overview**:
+The Narrative Construction system provides a structured approach to building legal narratives with plot points as the organizational backbone. Users can create a main narrative with key moments (plot points) and optionally add sub-narratives for detailed exploration.
+
+**Core Architecture - Plot Points System**:
+```
+Main Narrative (auto-created, one per case)
+  │
+  ├─ Plot Point 1: "Incident Occurred"
+  │   ├─ Direct content in TipTap editor
+  │   ├─ Sub-Narrative: "Witness A's Account" (optional)
+  │   └─ Sub-Narrative: "Medical Evidence Thread" (optional)
+  │
+  ├─ Plot Point 2: "Hospital Admission"
+  │   └─ Direct content (no sub-narratives needed)
+  │
+  └─ Plot Point 3: "Police Report Filed"
+      └─ Sub-Narrative: "Chain of Custody Analysis"
+```
+
+**Design Philosophy**:
+- Plot points force organization around key moments
+- Sub-narratives only when depth is needed
+- Not every plot point requires sub-narratives
+- But every sub-narrative must attach to a plot point
+- This prevents unstructured narrative sprawl
+
+**NarrativeConstructionTab** (components/NarrativeConstructionTab.tsx):
+
+**Two-Panel Layout**:
+- **Left Panel**: TipTap rich text editor for writing
+- **Right Panel**: Narrative Chat assistant with context awareness
+
+**Toolbar Features**:
+- "+ Plot Point" - Create new key moment in main narrative
+- "+ Sub-Narrative" - Add detailed exploration to selected plot point (disabled until plot point selected)
+- "Save" - Persist current plot point/sub-narrative content
+
+**Workflow**:
+1. User clicks "+ Plot Point" → Modal asks for title → Creates plot point
+2. Select plot point from dropdown → Content loads in TipTap editor
+3. Edit and click "Save" to persist
+4. Optional: Click "+ Sub-Narrative" → Modal asks for title → Attaches to current plot point
+5. Switch between "Main Plot Point Content" and sub-narratives via dropdown
+
+**Dual System Prompts** (Settings):
+- **Main Chat System Prompt**: For strategic case analysis (ChatTab)
+- **Narrative Chat System Prompt**: For persuasive writing assistance (NarrativeConstructionTab)
+- Both customizable in Settings tab
+- Narrative chat receives context about current plot point, sub-narratives, insights, and arguments
+
+**API Endpoints**:
+- `GET /api/narratives?case_id={id}` - Fetch all narratives (main + subs)
+- `POST /api/narratives` - Create sub-narrative (main auto-created)
+- `GET /api/narratives/{id}/plot-points` - Fetch plot points for narrative
+- `POST /api/narratives/{id}/plot-points` - Create new plot point
+- `PUT /api/narratives/{id}/plot-points/{plotId}` - Update plot point content
+- `GET /api/plot-points/{id}/sub-narratives` - Fetch sub-narratives for plot point
+- `POST /api/narrative-chat` - AI assistant with narrative context
+
+**Key Implementation Details**:
+- TipTap configured with `immediatelyRender: false` to prevent SSR hydration issues
+- InputModal component replaces browser `prompt()` (not supported in Next.js)
+- Auto-initialization ensures one main narrative per case on startup
+- Plot point selector required; sub-narrative selector optional
+
+**Current Status (MVP)**:
+✅ Tab reorganization with dropdown menus (Workspace, Case Materials, Utilities)
+✅ Dual system prompts in Settings
+✅ Plot points database schema with cascade deletes
+✅ TipTap rich text editor integration
+✅ Two-panel layout (editor + narrative chat)
+✅ Plot point creation and editing
+✅ Sub-narrative creation and attachment
+✅ Context-aware narrative chat assistant
+
+**Future Enhancements (Phase 1b+)**:
+- Date/time input for plot points (for timeline integration)
+- "Peg to Timeline" feature for chronological organization
+- Evidence attachment to plot points
+- Insights/snippets linking
+- Gantt-style timeline visualization
+- "Generate Final Draft" assembly feature
+
+**Important Notes**:
+- Deleting database requires restart to regenerate schema
+- Evidence files survive database deletion (stored in `data/evidence/`)
+- Chat repository independent of case database (stored in `userData/chats/`)
+- One main narrative per case is enforced at initialization
+
 ### Component Structure
 
 **Page Layout** (app/page.tsx):
-- Tabbed interface with conditional Baserow tab (based on settings)
-- Each tab wraps a component: ChatTab, EvidenceTab, InsightsTab (reused for insights/arguments/todos)
-- Uses Radix UI tabs with icons from lucide-react
+- Reorganized tabbed interface with three dropdown menus for better organization
+- Uses Radix UI dropdown menus + tabs with icons from lucide-react
+
+**Dropdown Menu Structure**:
+1. **Workspace** (Hammer icon)
+   - Chat (MessageSquare)
+   - Narrative Construction (FileText)
+   - Chat Repository (FolderOpen)
+
+2. **Case Materials** (Briefcase icon)
+   - Evidence (FileText)
+   - Key Insights (Lightbulb)
+   - Arguments (Scale)
+
+3. **Utilities** (Wrench icon)
+   - To-Do (CheckSquare)
+   - Settings (Settings)
+   - Baserow (Database - conditional, based on settings)
 
 **Reusable Pattern**:
 - InsightsTab component handles three categories by accepting `category` prop: 'insight', 'argument', 'todo'
 - All tabs receive `caseId` prop for multi-case support (though UI currently shows only first case)
+- NarrativeConstructionTab receives `caseId` and loads main narrative automatically
 
 ### API Routes Pattern
 
@@ -191,6 +315,11 @@ All routes in `app/api/**/route.ts` follow Next.js 13+ App Router conventions:
 - `/api/evidence` - File upload handler (saves to `data/evidence/`)
 - `/api/insights` - CRUD for saved insights/arguments/todos
 - `/api/settings` - Key-value settings persistence
+- `/api/narratives` - Fetch and create narratives (main auto-created)
+- `/api/narratives/[narrativeId]/plot-points` - CRUD for plot points
+- `/api/narratives/[narrativeId]/plot-points/[plotPointId]` - Update/delete specific plot point
+- `/api/plot-points/[plotPointId]/sub-narratives` - Fetch sub-narratives for plot point
+- `/api/narrative-chat` - AI assistant with narrative-aware context
 - `/api/baserow/test` - Optional Baserow connection testing
 
 ## Local Data Storage

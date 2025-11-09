@@ -13,6 +13,8 @@ export function SettingsTab() {
   const [baserowEnabled, setBaserowEnabled] = useState(false);
   const [baserowUrl, setBaserowUrl] = useState('http://localhost:8000');
   const [baserowToken, setBaserowToken] = useState('');
+  const [systemPromptMain, setSystemPromptMain] = useState('');
+  const [systemPromptNarrative, setSystemPromptNarrative] = useState('');
 
   useEffect(() => {
     loadSettings();
@@ -26,28 +28,12 @@ export function SettingsTab() {
       setBaserowEnabled(data?.baserow_enabled === 'true');
       setBaserowUrl(data?.baserow_url ?? 'http://localhost:8000');
       setBaserowToken(data?.baserow_token ?? '');
+      setSystemPromptMain(data?.system_prompt_main ?? data?.custom_system_prompt ?? '');
+      setSystemPromptNarrative(data?.system_prompt_narrative ?? '');
     } catch (error) {
       console.error('Failed to load settings:', error);
     }
   };
-
-
-    // New state for custom system prompt
-    const [customPrompt, setCustomPrompt] = useState('');
-  
-    useEffect(() => {
-      // Fetch current settings for custom prompt, if available
-      const loadCustomPrompt = async () => {
-        try {
-          const res = await fetch('/api/settings');
-          const data = await res.json();
-          setCustomPrompt(data?.custom_system_prompt ?? '');
-        } catch (error) {
-          console.error('Failed to load custom prompt:', error);
-        }
-      };
-      loadCustomPrompt();
-    }, []);
   const saveSettings = async () => {
     try {
       await fetch('/api/settings', {
@@ -58,7 +44,8 @@ export function SettingsTab() {
           baserow_enabled: baserowEnabled.toString(),
           baserow_url: baserowUrl,
           baserow_token: baserowToken,
-          custom_system_prompt: customPrompt,
+          system_prompt_main: systemPromptMain,
+          system_prompt_narrative: systemPromptNarrative,
         }),
       });
       toast.success('Settings saved');
@@ -115,18 +102,48 @@ export function SettingsTab() {
             </p>
           </div>
   
-          {/* Custom System Prompt */}
-          <div className="border border-border rounded-lg p-6 space-y-4">
-            <h3 className="text-lg font-semibold">Custom System Prompt</h3>
+        </div>
+
+        {/* System Prompts */}
+        <div className="border border-border rounded-lg p-6 space-y-6">
+          <div>
+            <h3 className="text-lg font-semibold mb-2">System Prompts</h3>
             <p className="text-sm text-muted-foreground">
-              Modify LegalMind’s core identity and behavior by providing a personal system prompt addition below.
-              This overlay merges with the backend cognitive base.
+              Customize how each chat assistant behaves. These prompts overlay the base AI behavior.
+            </p>
+          </div>
+
+          {/* Main Chat System Prompt */}
+          <div className="space-y-2">
+            <Label htmlFor="prompt-main" className="text-base font-medium">
+              Main Chat System Prompt
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              For strategic case analysis and legal advisory conversations.
             </p>
             <textarea
-              className="w-full min-h-[150px] border border-border rounded-md p-3 text-sm font-mono bg-background text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-              value={customPrompt}
-              onChange={(e) => setCustomPrompt(e?.target?.value ?? '')}
-              placeholder={"Example: You are my private legal strategist. Speak informally and focus on risk analysis."}
+              id="prompt-main"
+              className="w-full min-h-[120px] border border-border rounded-md p-3 text-sm font-mono bg-background text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              value={systemPromptMain}
+              onChange={(e) => setSystemPromptMain(e?.target?.value ?? '')}
+              placeholder="Example: You are my strategic legal advisor. Focus on risk analysis and case weaknesses."
+            />
+          </div>
+
+          {/* Narrative Chat System Prompt */}
+          <div className="space-y-2">
+            <Label htmlFor="prompt-narrative" className="text-base font-medium">
+              Narrative Chat System Prompt
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              For narrative construction and persuasive legal writing assistance.
+            </p>
+            <textarea
+              id="prompt-narrative"
+              className="w-full min-h-[120px] border border-border rounded-md p-3 text-sm font-mono bg-background text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              value={systemPromptNarrative}
+              onChange={(e) => setSystemPromptNarrative(e?.target?.value ?? '')}
+              placeholder="Example: You are a legal writing assistant. Help me craft compelling narratives backed by evidence."
             />
           </div>
         </div>

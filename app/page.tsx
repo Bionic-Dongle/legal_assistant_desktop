@@ -3,15 +3,20 @@
 
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
 import { ChatTab } from '@/components/ChatTab';
 import { EvidenceTab } from '@/components/EvidenceTab';
 import { InsightsTab } from '@/components/InsightsTab';
 import { SettingsTab } from '@/components/SettingsTab';
-import { MessageSquare, FileText, Lightbulb, Scale, CheckSquare, Database, Settings } from 'lucide-react';
+import { NarrativeConstructionTab } from '@/components/NarrativeConstructionTab';
+import { MessageSquare, FileText, Lightbulb, Scale, CheckSquare, Database, Settings, FolderOpen, ChevronDown, Briefcase, Hammer, Wrench } from 'lucide-react';
+import { ChatRepositoryTab } from '@/components/ChatRepositoryTab';
 
 export default function Home() {
   const [caseId, setCaseId] = useState('');
   const [baserowEnabled, setBaserowEnabled] = useState(false);
+  const [activeTab, setActiveTab] = useState('chat');
 
   useEffect(() => {
     initializeApp();
@@ -31,38 +36,84 @@ export default function Home() {
 
   return (
     <div className="h-screen flex flex-col bg-background">
-      <Tabs defaultValue="chat" className="flex-1 flex flex-col">
-        <TabsList className="w-full rounded-none">
-          <TabsTrigger value="chat" className="gap-2">
-            <MessageSquare className="w-4 h-4" />
-            Chat
-          </TabsTrigger>
-          <TabsTrigger value="evidence" className="gap-2">
-            <FileText className="w-4 h-4" />
-            Evidence
-          </TabsTrigger>
-          <TabsTrigger value="insights" className="gap-2">
-            <Lightbulb className="w-4 h-4" />
-            Key Insights
-          </TabsTrigger>
-          <TabsTrigger value="arguments" className="gap-2">
-            <Scale className="w-4 h-4" />
-            Arguments
-          </TabsTrigger>
-          <TabsTrigger value="todos" className="gap-2">
-            <CheckSquare className="w-4 h-4" />
-            To-Do
-          </TabsTrigger>
-          {baserowEnabled && (
-            <TabsTrigger value="baserow" className="gap-2">
-              <Database className="w-4 h-4" />
-              Baserow
-            </TabsTrigger>
-          )}
-          <TabsTrigger value="settings" className="gap-2">
-            <Settings className="w-4 h-4" />
-            Settings
-          </TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+        <TabsList className="w-full rounded-none justify-start">
+          {/* Workspace Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="gap-2 px-6 py-2 h-auto">
+                <Hammer className="w-4 h-4" />
+                Workspace
+                <ChevronDown className="w-3 h-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => setActiveTab('chat')} className="gap-2 cursor-pointer">
+                <MessageSquare className="w-4 h-4" />
+                Chat
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setActiveTab('narrative')} className="gap-2 cursor-pointer">
+                <FileText className="w-4 h-4" />
+                Narrative Construction
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setActiveTab('repository')} className="gap-2 cursor-pointer">
+                <FolderOpen className="w-4 h-4" />
+                Chat Repository
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Case Materials Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="gap-2 px-6 py-2 h-auto">
+                <Briefcase className="w-4 h-4" />
+                Case Materials
+                <ChevronDown className="w-3 h-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => setActiveTab('evidence')} className="gap-2 cursor-pointer">
+                <FileText className="w-4 h-4" />
+                Evidence
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setActiveTab('insights')} className="gap-2 cursor-pointer">
+                <Lightbulb className="w-4 h-4" />
+                Key Insights
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setActiveTab('arguments')} className="gap-2 cursor-pointer">
+                <Scale className="w-4 h-4" />
+                Arguments
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Utilities Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="gap-2 px-6 py-2 h-auto">
+                <Wrench className="w-4 h-4" />
+                Utilities
+                <ChevronDown className="w-3 h-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => setActiveTab('todos')} className="gap-2 cursor-pointer">
+                <CheckSquare className="w-4 h-4" />
+                To-Do
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setActiveTab('settings')} className="gap-2 cursor-pointer">
+                <Settings className="w-4 h-4" />
+                Settings
+              </DropdownMenuItem>
+              {baserowEnabled && (
+                <DropdownMenuItem onClick={() => setActiveTab('baserow')} className="gap-2 cursor-pointer">
+                  <Database className="w-4 h-4" />
+                  Baserow
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </TabsList>
 
         <div className="flex-1 overflow-hidden">
@@ -99,6 +150,14 @@ export default function Home() {
 
           <TabsContent value="settings" className="h-full m-0 overflow-y-auto">
             <SettingsTab />
+          </TabsContent>
+
+          <TabsContent value="repository" className="h-full m-0 overflow-y-auto">
+            <ChatRepositoryTab />
+          </TabsContent>
+
+          <TabsContent value="narrative" className="h-full m-0">
+            <NarrativeConstructionTab caseId={caseId} />
           </TabsContent>
         </div>
       </Tabs>

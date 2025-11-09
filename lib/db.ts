@@ -60,9 +60,24 @@ export function initDatabase() {
     CREATE TABLE IF NOT EXISTS narratives (
       id TEXT PRIMARY KEY,
       case_id TEXT NOT NULL,
-      content TEXT NOT NULL,
+      title TEXT NOT NULL,
+      narrative_type TEXT NOT NULL CHECK (narrative_type IN ('main', 'sub')),
+      plot_point_id TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+      FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE,
+      FOREIGN KEY (plot_point_id) REFERENCES plot_points(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS plot_points (
+      id TEXT PRIMARY KEY,
+      narrative_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (narrative_id) REFERENCES narratives(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS settings (
@@ -74,6 +89,8 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_evidence_case ON evidence(case_id);
     CREATE INDEX IF NOT EXISTS idx_insights_case ON saved_insights(case_id);
     CREATE INDEX IF NOT EXISTS idx_narratives_case ON narratives(case_id);
+    CREATE INDEX IF NOT EXISTS idx_plot_points_narrative ON plot_points(narrative_id);
+    CREATE INDEX IF NOT EXISTS idx_narratives_plot_point ON narratives(plot_point_id);
   `);
 
   // Insert default case if none exists
@@ -85,6 +102,22 @@ export function initDatabase() {
       'Sample Case',
       'Your first legal case workspace'
     );
+  }
+
+  // Ensure each case has exactly one main narrative
+  const cases = db.prepare('SELECT id FROM cases').all() as Array<{ id: string }>;
+  for (const caseRow of cases) {
+    const mainNarrative = db.prepare('SELECT id FROM narratives WHERE case_id = ? AND narrative_type = ?').get(caseRow.id, 'main');
+    if (!mainNarrative) {
+      const narrativeId = `narr-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      db.prepare('INSERT INTO narratives (id, case_id, title, narrative_type, plot_point_id) VALUES (?, ?, ?, ?, ?)').run(
+        narrativeId,
+        caseRow.id,
+        'Main Narrative',
+        'main',
+        null
+      );
+    }
   }
 }
 
