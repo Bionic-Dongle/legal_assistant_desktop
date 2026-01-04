@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { queryDocuments } from '@/lib/chroma';
+import { buildCaseContext } from '@/lib/context';
 
 export async function POST(request: Request) {
   try {
@@ -38,40 +39,58 @@ export async function POST(request: Request) {
       }
     }
 
-    // Query relevant documents from ChromaDB
+    // Build unified case context (includes evidence, insights, arguments, precedents)
     let context = '';
     try {
-      const plaintiffDocs = await queryDocuments(`plaintiff_${caseId}`, message, 3);
-      const oppositionDocs = await queryDocuments(`opposition_${caseId}`, message, 3);
-      
-      if (plaintiffDocs?.documents?.[0]?.length > 0) {
-        context += '\nPlaintiff Evidence:\n' + plaintiffDocs.documents[0].join('\n\n');
-      }
-      if (oppositionDocs?.documents?.[0]?.length > 0) {
-        context += '\nOpposition Evidence:\n' + oppositionDocs.documents[0].join('\n\n');
-      }
+      context = await buildCaseContext(caseId, message, { includePrecedents: true });
     } catch (error) {
-      console.log('No documents found in vector DB:', error);
+      console.log('⚠️ Context assembly failed, falling back to empty context:', error);
     }
 
     // Build adaptive system prompt combining backend core + Settings custom overlay
     let response: string = "";
     try {
       const allSettings = db.prepare("SELECT key, value FROM settings").all() as { key: string; value: string }[];
-      const found = allSettings.find(s => s.key.toLowerCase().includes("openai"));
-      const apiKey = found?.value?.trim();
+      const found = allSettings.find(s => s.key === "openai_key");
+      const apiKey = (process.env.OPENAI_API_KEY || found?.value?.trim());
 
-      // --- Core base prompt defined here ---
-      const baseSystemPrompt = `
-You are LegalMind — a local, privacy‑first legal reasoning environment.
+      console.log("🔍 Settings check:", {
+        foundKey: found?.key,
+        hasValue: !!found?.value,
+        valuePrefix: found?.value?.substring(0, 10),
+        finalApiKey: apiKey ? `${apiKey.substring(0, 10)}...` : 'NOT FOUND'
+      });
+
+      // --- Determine base system prompt ---
+      // --- Determine base system prompt (check all possible key variants) ---
+      const promptKeys = [
+        'main_chat_system_prompt',
+        'system_prompt_main',
+        'custom_system_prompt',
+        'main_system_prompt',
+        'chat_system_prompt'
+      ];
+
+      const userPrompt = (() => {
+        for (const key of promptKeys) {
+          const foundPrompt = allSettings.find(
+            (s) => s.key.toLowerCase() === key.toLowerCase()
+          );
+          if (foundPrompt?.value?.trim()) return foundPrompt.value.trim();
+        }
+        return '';
+      })();
+
+      let baseSystemPrompt: string;
+      if (userPrompt) {
+        baseSystemPrompt = userPrompt;
+      } else {
+        baseSystemPrompt = `You are LegalMind — a local, privacy‑first legal reasoning environment.
 Maintain two cognitive modes:
 • **Analytical Mode** — precise, logical reasoning grounded in evidence and law.
 • **Conversational Mode** — flexible, contextually aware, adapting tone to human dialogue history.
 Prioritize factual grounding, but sustain continuity with the user’s ongoing narrative.`;
-
-      // Optional overlay: user‑configurable custom system prompt
-      const overlayEntry = allSettings.find(s => s.key.toLowerCase() === "custom_system_prompt");
-      const overlayPrompt = overlayEntry?.value ? `\n\n### User Custom System Instruction\n${overlayEntry.value}` : "";
+      }
 
       // --- Multi‑repository context assembly ---
       const insights = db.prepare("SELECT content, created_at FROM saved_insights WHERE case_id = ? AND category = 'insight' ORDER BY created_at DESC").all(caseId);
@@ -80,7 +99,11 @@ Prioritize factual grounding, but sustain continuity with the user’s ongoing n
       const insightsContext = (insights as any[]).map((i: any) => `• (${i.created_at}) ${i.content}`).join("\n") || "No saved insights yet.";
       const argumentsContext = (argumentsSet as any[]).map((a: any) => `• (${a.created_at}) ${a.content}`).join("\n") || "No saved arguments yet.";
 
-      const systemPrompt = `${baseSystemPrompt}${overlayPrompt}
+      // --- Assemble final system prompt ---
+      const systemPrompt = `${baseSystemPrompt}
+
+### Case Context (memory from buildCaseContext)
+${context || "No contextual data yet."}
 
 ### Repositories
 1. Evidence Repository — documents.
@@ -106,6 +129,11 @@ ${argumentsContext}
         console.warn("⚠️ Missing OpenAI key — using mock response.");
         response = generateMockResponse(message, context);
       } else {
+        // Get selected model from settings (default to gpt-4o-mini)
+        const modelSetting = allSettings.find(s => s.key === "openai_model");
+        const selectedModel = modelSetting?.value?.trim() || "gpt-4o-mini";
+
+        console.log("🚀 Attempting OpenAI API call with model:", selectedModel);
         const OpenAI = (await import("openai")).default;
         const openai = new OpenAI({ apiKey });
 
@@ -121,7 +149,7 @@ ${argumentsContext}
         }));
 
         const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
+          model: selectedModel,
           temperature: 0.8,
           top_p: 0.9,
           messages: [
@@ -132,10 +160,28 @@ ${argumentsContext}
         });
 
         response = completion?.choices?.[0]?.message?.content?.trim() || "⚠️ Empty response from model.";
+        console.log("✅ OpenAI response received successfully");
       }
     } catch (error: any) {
-      console.error("💥 prompt assembly failed:", error?.message || error);
-      response = generateMockResponse(message, context);
+      console.error("💥 Error in chat processing:", {
+        message: error?.message,
+        status: error?.status,
+        type: error?.type,
+        stack: error?.stack?.split('\n')[0]
+      });
+
+      // Provide more helpful error messages instead of mock response
+      if (error?.status === 401) {
+        response = "❌ **OpenAI API Key Error**\n\nYour API key is invalid or has been revoked. Please:\n\n1. Go to https://platform.openai.com/api-keys\n2. Create a new API key\n3. Copy the entire key (starts with 'sk-')\n4. Go to Settings tab and paste it in the API Key field\n5. Click 'Save Settings'\n6. Make sure your OpenAI account has billing enabled\n\nThen try your message again.";
+      } else if (error?.status === 429) {
+        response = "❌ **Rate Limit Exceeded**\n\nYou've exceeded your OpenAI API rate limit or quota. This could mean:\n\n1. Too many requests in a short time (wait a minute and try again)\n2. Monthly quota exceeded (check your OpenAI billing dashboard)\n3. Free tier limits reached (upgrade your OpenAI plan)\n\nVisit https://platform.openai.com/account/billing to check your usage.";
+      } else if (error?.status === 403) {
+        response = "❌ **Access Denied**\n\nYour API key doesn't have permission to access this model. This usually means:\n\n1. Your key is for a different organization\n2. The model requires a paid plan\n3. Your account doesn't have access to this model\n\nCheck your OpenAI dashboard or try selecting a different model in Settings.";
+      } else if (error?.message?.includes('fetch') || error?.message?.includes('network')) {
+        response = "❌ **Network Error**\n\nCouldn't connect to OpenAI servers. Please check:\n\n1. Your internet connection\n2. Firewall or proxy settings\n3. OpenAI service status: https://status.openai.com\n\nThen try again.";
+      } else {
+        response = `❌ **Error**\n\n${error?.message || 'An unexpected error occurred'}\n\nError type: ${error?.type || 'unknown'}\nStatus: ${error?.status || 'N/A'}\n\nIf this persists, check the terminal logs for more details.`;
+      }
     }
 
     // Save assistant message

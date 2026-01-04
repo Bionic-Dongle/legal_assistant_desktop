@@ -1,56 +1,59 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import Placeholder from '@tiptap/extension-placeholder';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Textarea } from './ui/textarea';
-import { Send, Loader2, Save, Plus } from 'lucide-react';
+import { Plus, ListPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { InputModal } from './InputModal';
+import { TimelineGrid } from './TimelineGrid';
+import { TimelineToolbar } from './TimelineToolbar';
+import { PlotPointEditModal } from './PlotPointEditModal';
 
-interface Message {
-  role: 'user' | 'assistant';
+interface Thread {
+  id: string;
+  case_id: string;
+  title: string;
+  description: string | null;
+  color: string;
+  sort_order: number;
+  is_visible: boolean;
+}
+
+interface PlotPoint {
+  id: string;
+  narrative_id: string;
+  thread_id: string | null;
+  title: string;
   content: string;
+  event_date: string | null;
+  sort_order: number;
+  attachments?: string | null;
 }
 
 export function NarrativeConstructionTab({ caseId }: { caseId: string }) {
   const [mainNarrativeId, setMainNarrativeId] = useState<string>('');
-  const [plotPoints, setPlotPoints] = useState<any[]>([]);
-  const [activePlotPointId, setActivePlotPointId] = useState<string>('');
-  const [plotPointTitle, setPlotPointTitle] = useState('');
-  const [subNarratives, setSubNarratives] = useState<any[]>([]);
-  const [activeSubNarrativeId, setActiveSubNarrativeId] = useState<string>('');
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [showPlotPointModal, setShowPlotPointModal] = useState(false);
-  const [showSubNarrativeModal, setShowSubNarrativeModal] = useState(false);
+  const [threads, setThreads] = useState<Thread[]>([]);
+  const [plotPoints, setPlotPoints] = useState<PlotPoint[]>([]);
+  const [selectedPlotPoint, setSelectedPlotPoint] = useState<PlotPoint | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [showThreadModal, setShowThreadModal] = useState(false);
 
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Placeholder.configure({
-        placeholder: 'Start writing your narrative section...',
-      }),
-    ],
-    content: '',
-    immediatelyRender: false,
-    editorProps: {
-      attributes: {
-        class: 'prose prose-sm max-w-none focus:outline-none min-h-[400px] p-4',
-      },
-    },
-  });
+  // Timeline controls
+  const [zoomLevel, setZoomLevel] = useState<'year' | 'quarter' | 'month' | 'week'>('month');
+  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
 
   useEffect(() => {
     if (caseId) {
       loadMainNarrative();
+      loadThreads();
     }
   }, [caseId]);
+
+  useEffect(() => {
+    if (mainNarrativeId) {
+      loadPlotPoints();
+    }
+  }, [mainNarrativeId]);
 
   const loadMainNarrative = async () => {
     try {
@@ -60,304 +63,270 @@ export function NarrativeConstructionTab({ caseId }: { caseId: string }) {
 
       if (mainNarrative) {
         setMainNarrativeId(mainNarrative.id);
-        loadPlotPoints(mainNarrative.id);
       }
     } catch (error) {
       console.error('Failed to load main narrative:', error);
+      toast.error('Failed to load narrative');
     }
   };
 
-  const loadPlotPoints = async (narrativeId: string) => {
+  const loadThreads = async () => {
     try {
-      const res = await fetch(`/api/narratives/${narrativeId}/plot-points`);
+      const res = await fetch(`/api/narrative-threads?case_id=${caseId}`);
+      const data = await res.json();
+      setThreads(data?.threads ?? []);
+    } catch (error) {
+      console.error('Failed to load threads:', error);
+      toast.error('Failed to load narrative threads');
+    }
+  };
+
+  const loadPlotPoints = async () => {
+    try {
+      const res = await fetch(`/api/narratives/${mainNarrativeId}/plot-points`);
       const data = await res.json();
       setPlotPoints(data?.plotPoints ?? []);
-
-      // Auto-select first plot point if available
-      if (data?.plotPoints?.length > 0 && !activePlotPointId) {
-        selectPlotPoint(data.plotPoints[0]);
-      }
     } catch (error) {
       console.error('Failed to load plot points:', error);
+      toast.error('Failed to load plot points');
     }
   };
 
-  const selectPlotPoint = (plotPoint: any) => {
-    setActivePlotPointId(plotPoint.id);
-    setPlotPointTitle(plotPoint.title);
-    editor?.commands.setContent(plotPoint.content);
-    loadSubNarratives(plotPoint.id);
-    setActiveSubNarrativeId(''); // Reset sub-narrative when changing plot points
-  };
-
-  const loadSubNarratives = async (plotPointId: string) => {
+  const handleCreateThread = async (title: string) => {
     try {
-      const res = await fetch(`/api/plot-points/${plotPointId}/sub-narratives`);
-      const data = await res.json();
-      setSubNarratives(data?.subNarratives ?? []);
-    } catch (error) {
-      console.error('Failed to load sub-narratives:', error);
-    }
-  };
+      const colors = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444'];
+      const randomColor = colors[threads.length % colors.length];
 
-  const handleCreatePlotPoint = async (title: string) => {
-    if (!mainNarrativeId) {
-      toast.error('Main narrative not loaded');
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/narratives/${mainNarrativeId}/plot-points`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          content: '',
-          sort_order: plotPoints.length,
-        }),
-      });
-      const data = await res.json();
-      toast.success('Plot point created');
-      loadPlotPoints(mainNarrativeId);
-    } catch (error) {
-      toast.error('Failed to create plot point');
-    }
-  };
-
-  const handleCreateSubNarrative = async (title: string) => {
-    if (!activePlotPointId) {
-      toast.error('Please select a plot point first');
-      return;
-    }
-
-    try {
-      const res = await fetch('/api/narratives', {
+      await fetch('/api/narrative-threads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           case_id: caseId,
           title,
-          narrative_type: 'sub',
-          plot_point_id: activePlotPointId,
+          description: '',
+          color: randomColor,
+          sort_order: threads.length,
         }),
       });
-      const data = await res.json();
-      toast.success('Sub-narrative created');
-      loadSubNarratives(activePlotPointId);
+
+      toast.success('Thread created');
+      loadThreads();
     } catch (error) {
-      toast.error('Failed to create sub-narrative');
+      toast.error('Failed to create thread');
     }
   };
 
-  const savePlotPoint = async () => {
-    if (!activePlotPointId) {
-      toast.error('No plot point selected');
+  const handleCreatePlotPoint = async () => {
+    if (threads.length === 0) {
+      toast.error('Please create at least one narrative thread first');
       return;
     }
+    setSelectedPlotPoint(null);
+    setIsEditModalOpen(true);
+  };
 
+  const handleEditPlotPoint = (plotPoint: PlotPoint) => {
+    setSelectedPlotPoint(plotPoint);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSavePlotPoint = async (data: {
+    title: string;
+    content: string;
+    event_date: string;
+    thread_id: string;
+  }) => {
     try {
-      const content = editor?.getHTML() ?? '';
-      await fetch(`/api/narratives/${mainNarrativeId}/plot-points/${activePlotPointId}`, {
+      if (selectedPlotPoint) {
+        // Update existing plot point
+        await fetch(`/api/narratives/${mainNarrativeId}/plot-points/${selectedPlotPoint.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        toast.success('Plot point updated');
+      } else {
+        // Create new plot point
+        await fetch(`/api/narratives/${mainNarrativeId}/plot-points`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...data,
+            sort_order: plotPoints.length,
+          }),
+        });
+        toast.success('Plot point created');
+      }
+
+      loadPlotPoints();
+    } catch (error) {
+      toast.error('Failed to save plot point');
+      throw error;
+    }
+  };
+
+  const handlePlotPointMove = async (
+    plotPointId: string,
+    newThreadId: string,
+    newEventDate: string | null
+  ) => {
+    try {
+      await fetch(`/api/narratives/${mainNarrativeId}/plot-points/${plotPointId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: plotPointTitle,
-          content,
+          thread_id: newThreadId,
+          event_date: newEventDate,
         }),
       });
-      toast.success('Plot point saved');
-      loadPlotPoints(mainNarrativeId);
+
+      toast.success('Plot point moved');
+      loadPlotPoints();
     } catch (error) {
-      toast.error('Failed to save plot point');
+      toast.error('Failed to move plot point');
     }
   };
 
-  const sendNarrativeMessage = async () => {
-    if (!input.trim() || isLoading) return;
-
-    const userMessage: Message = { role: 'user', content: input };
-    setMessages((prev) => [...prev, userMessage]);
-    setInput('');
-    setIsLoading(true);
-
+  const handleThreadReorder = async (activeThreadId: string, overThreadId: string) => {
     try {
-      const res = await fetch('/api/narrative-chat', {
-        method: 'POST',
+      // Find the threads
+      const activeThread = threads.find(t => t.id === activeThreadId);
+      const overThread = threads.find(t => t.id === overThreadId);
+
+      if (!activeThread || !overThread) return;
+
+      // Create a new sorted array with the active thread moved to the over position
+      const sortedThreads = [...threads].sort((a, b) => a.sort_order - b.sort_order);
+      const activeIndex = sortedThreads.findIndex(t => t.id === activeThreadId);
+      const overIndex = sortedThreads.findIndex(t => t.id === overThreadId);
+
+      // Remove active thread from its current position
+      const [movedThread] = sortedThreads.splice(activeIndex, 1);
+
+      // Insert it at the new position
+      sortedThreads.splice(overIndex, 0, movedThread);
+
+      // Renumber all threads sequentially
+      const updates = sortedThreads.map((thread, index) =>
+        fetch(`/api/narrative-threads/${thread.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sort_order: index }),
+        })
+      );
+
+      await Promise.all(updates);
+      loadThreads();
+    } catch (error) {
+      toast.error('Failed to reorder thread');
+    }
+  };
+
+  const handleToggleThreadVisibility = async (threadId: string) => {
+    try {
+      const thread = threads.find(t => t.id === threadId);
+      if (!thread) return;
+
+      await fetch(`/api/narrative-threads/${threadId}`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          case_id: caseId,
-          narrative_id: mainNarrativeId,
-          plot_point_id: activePlotPointId,
-          sub_narrative_id: activeSubNarrativeId,
-          message: input,
-          messages: messages.slice(-6),
+          is_visible: !thread.is_visible,
         }),
       });
 
-      const data = await res.json();
-      const assistantMessage: Message = {
-        role: 'assistant',
-        content: data?.reply ?? 'No response received',
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
+      loadThreads();
     } catch (error) {
-      toast.error('Failed to send message');
-    } finally {
-      setIsLoading(false);
+      toast.error('Failed to toggle thread visibility');
     }
   };
 
   return (
-    <div className="h-full flex">
-      {/* Left Panel: Editor */}
-      <div className="flex-1 flex flex-col border-r border-border">
-        {/* Toolbar */}
-        <div className="border-b border-border p-4 space-y-3">
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={() => setShowPlotPointModal(true)}>
-              <Plus className="w-4 h-4 mr-1" />
-              Plot Point
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setShowSubNarrativeModal(true)} disabled={!activePlotPointId}>
-              <Plus className="w-4 h-4 mr-1" />
-              Sub-Narrative
-            </Button>
-            <Button size="sm" variant="default" onClick={savePlotPoint} disabled={!activePlotPointId}>
-              <Save className="w-4 h-4 mr-1" />
-              Save
-            </Button>
-          </div>
+    <div className="h-full flex flex-col">
+      {/* Toolbar */}
+      <div className="border-b border-border p-4 flex gap-2 items-center">
+        <Button size="sm" variant="outline" onClick={() => setShowThreadModal(true)}>
+          <ListPlus className="w-4 h-4 mr-1" />
+          New Thread
+        </Button>
+        <Button size="sm" variant="default" onClick={handleCreatePlotPoint}>
+          <Plus className="w-4 h-4 mr-1" />
+          New Plot Point
+        </Button>
 
-          {/* Plot Point Selector */}
-          <div className="flex gap-2">
-            <select
-              className="flex-1 border border-border rounded-md p-2 bg-background"
-              value={activePlotPointId}
-              onChange={(e) => {
-                const plotPoint = plotPoints.find((p) => p.id === e.target.value);
-                if (plotPoint) {
-                  selectPlotPoint(plotPoint);
-                }
-              }}
-            >
-              <option value="">Select Plot Point...</option>
-              {plotPoints.map((p) => (
-                <option key={p.id} value={p.id}>
-                  📍 {p.title}
-                </option>
+        {/* Zoom Controls */}
+        {threads.length > 0 && (
+          <>
+            <div className="border-l border-border h-6 mx-2" />
+            <span className="text-xs text-muted-foreground">Zoom:</span>
+            <div className="flex gap-1">
+              {(['year', 'quarter', 'month', 'week'] as const).map((level) => (
+                <Button
+                  key={level}
+                  size="sm"
+                  variant={zoomLevel === level ? 'default' : 'ghost'}
+                  onClick={() => setZoomLevel(level)}
+                  className="h-7 px-2 text-xs"
+                >
+                  {level}
+                </Button>
               ))}
-            </select>
-
-            {/* Sub-Narrative Selector (Optional) */}
-            <select
-              className="flex-1 border border-border rounded-md p-2 bg-background"
-              value={activeSubNarrativeId}
-              onChange={(e) => setActiveSubNarrativeId(e.target.value)}
-              disabled={!activePlotPointId || subNarratives.length === 0}
-            >
-              <option value="">Main Plot Point Content</option>
-              {subNarratives.map((sn) => (
-                <option key={sn.id} value={sn.id}>
-                  📙 {sn.title}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Plot Point Title */}
-          {activePlotPointId && !activeSubNarrativeId && (
-            <Input
-              placeholder="Plot point title..."
-              value={plotPointTitle}
-              onChange={(e) => setPlotPointTitle(e.target.value)}
-            />
-          )}
-
-          {activeSubNarrativeId && (
-            <div className="text-sm text-muted-foreground p-2 bg-muted/30 rounded">
-              Editing sub-narrative: {subNarratives.find(s => s.id === activeSubNarrativeId)?.title}
             </div>
-          )}
-        </div>
+          </>
+        )}
 
-        {/* Editor */}
-        <div className="flex-1 overflow-y-auto">
-          <EditorContent editor={editor} />
+        <div className="flex-1" />
+        <div className="text-sm text-muted-foreground flex items-center">
+          {plotPoints.length} plot points across {threads.length} threads
         </div>
       </div>
 
-      {/* Right Panel: Narrative Chat */}
-      <div className="w-96 flex flex-col">
-        <div className="border-b border-border p-4">
-          <h3 className="font-semibold">Narrative Assistant</h3>
-          <p className="text-sm text-muted-foreground">
-            Ask questions about your narrative
-          </p>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.map((msg, idx) => (
-            <div key={idx} className={msg.role === 'user' ? 'text-right' : 'text-left'}>
-              <div
-                className={`inline-block p-3 rounded-lg max-w-[85%] ${
-                  msg.role === 'user'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-foreground'
-                }`}
-              >
-                {msg.content}
-              </div>
+      {/* Timeline Grid */}
+      <div className="flex-1 overflow-hidden">
+        {threads.length === 0 ? (
+          <div className="h-full flex items-center justify-center text-center">
+            <div>
+              <h3 className="text-lg font-semibold mb-2">No narrative threads yet</h3>
+              <p className="text-muted-foreground mb-4">
+                Create your first narrative thread to get started organizing your case timeline
+              </p>
+              <Button onClick={() => setShowThreadModal(true)}>
+                <ListPlus className="w-4 h-4 mr-2" />
+                Create First Thread
+              </Button>
             </div>
-          ))}
-          {isLoading && (
-            <div className="text-left">
-              <div className="inline-block p-3 rounded-lg bg-muted">
-                <Loader2 className="w-4 h-4 animate-spin" />
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="border-t border-border p-4">
-          <div className="flex gap-2">
-            <Textarea
-              placeholder="Ask about narrative..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  sendNarrativeMessage();
-                }
-              }}
-              className="resize-none"
-              rows={2}
-            />
-            <Button
-              onClick={sendNarrativeMessage}
-              disabled={!input.trim() || isLoading}
-              size="icon"
-            >
-              <Send className="w-4 h-4" />
-            </Button>
           </div>
-        </div>
+        ) : (
+          <TimelineGrid
+            plotPoints={plotPoints}
+            threads={threads}
+            onPlotPointClick={handleEditPlotPoint}
+            onPlotPointMove={handlePlotPointMove}
+            onThreadReorder={handleThreadReorder}
+            zoomLevel={zoomLevel}
+            dateRange={dateRange}
+          />
+        )}
       </div>
 
       {/* Modals */}
       <InputModal
-        isOpen={showPlotPointModal}
-        onClose={() => setShowPlotPointModal(false)}
-        onConfirm={handleCreatePlotPoint}
-        title="Create Plot Point"
-        placeholder="Enter plot point title..."
+        isOpen={showThreadModal}
+        onClose={() => setShowThreadModal(false)}
+        onConfirm={handleCreateThread}
+        title="Create Narrative Thread"
+        placeholder="Enter thread title (e.g., 'Liability Theory', 'Witness Timeline')..."
       />
-      <InputModal
-        isOpen={showSubNarrativeModal}
-        onClose={() => setShowSubNarrativeModal(false)}
-        onConfirm={handleCreateSubNarrative}
-        title="Create Sub-Narrative"
-        placeholder="Enter sub-narrative title..."
+
+      <PlotPointEditModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setSelectedPlotPoint(null);
+        }}
+        onSave={handleSavePlotPoint}
+        plotPoint={selectedPlotPoint}
+        threads={threads.filter(t => t.is_visible)}
       />
     </div>
   );

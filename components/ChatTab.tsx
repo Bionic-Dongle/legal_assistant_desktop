@@ -19,29 +19,45 @@ export function ChatTab({ caseId }: { caseId: string }) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId] = useState(() => crypto.randomUUID());
+  const [isSavedChat, setIsSavedChat] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const hasLoadedSavedChat = useRef(false);
+  const isLoadingSavedChat = useRef(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem("activeChat");
-    if (stored) {
-      try {
-        setMessages(JSON.parse(stored));
-      } catch {}
-    } else {
-      loadMessages();
-    }
-
     const handler = (event: CustomEvent) => {
+      // Prevent any database loading while loading saved chat
+      isLoadingSavedChat.current = true;
       setMessages(event.detail);
+      setIsSavedChat(true);
+      hasLoadedSavedChat.current = true;
+      // Allow database loading again after a short delay
+      setTimeout(() => {
+        isLoadingSavedChat.current = false;
+      }, 100);
     };
     window.addEventListener("chat-loaded", handler as EventListener);
     return () => {
       window.removeEventListener("chat-loaded", handler as EventListener);
     };
-  }, [caseId]);
+  }, []);
+
+  // Load messages from database only when caseId changes and we're not loading a saved chat
+  useEffect(() => {
+    if (!isLoadingSavedChat.current && !isSavedChat && !hasLoadedSavedChat.current) {
+      loadMessages();
+    }
+  }, [caseId, isSavedChat]);
 
   useEffect(() => {
     messagesEndRef?.current?.scrollIntoView?.({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Persist chat messages to localStorage so it reloads correctly when switching tabs or reopening app
+  useEffect(() => {
+    if (messages?.length) {
+      localStorage.setItem("activeChat", JSON.stringify(messages));
+    }
   }, [messages]);
 
   const loadMessages = async () => {
@@ -264,9 +280,26 @@ export function ChatTab({ caseId }: { caseId: string }) {
           <Button
             size="lg"
             variant="outline"
-            onClick={() => {
-              setMessages([]);
-              toast.success("Chat cleared");
+            onClick={async () => {
+              try {
+                // Clear messages from database
+                await fetch('/api/messages', {
+                  method: 'DELETE',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ caseId }),
+                });
+
+                // Clear UI state
+                setMessages([]);
+                setIsSavedChat(false);
+                hasLoadedSavedChat.current = false;
+                isLoadingSavedChat.current = false;
+                localStorage.removeItem("activeChat");
+                toast.success("Chat cleared");
+              } catch (error) {
+                console.error("Failed to clear chat:", error);
+                toast.error("Failed to clear chat");
+              }
             }}
           >
             Clear Chat

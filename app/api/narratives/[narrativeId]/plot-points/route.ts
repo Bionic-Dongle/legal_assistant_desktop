@@ -26,7 +26,7 @@ export async function POST(
   try {
     const { narrativeId } = params;
     const body = await request.json();
-    const { title, content, sort_order } = body;
+    const { title, content, sort_order, event_date, evidence_date, thread_id, attachments } = body;
 
     if (!title) {
       return NextResponse.json({ error: 'Title required' }, { status: 400 });
@@ -34,9 +34,9 @@ export async function POST(
 
     const id = `plot-${Date.now()}`;
     db.prepare(
-      `INSERT INTO plot_points (id, narrative_id, title, content, sort_order)
-       VALUES (?, ?, ?, ?, ?)`
-    ).run(id, narrativeId, title, content || '', sort_order || 0);
+      `INSERT INTO plot_points (id, narrative_id, thread_id, title, content, sort_order, event_date, evidence_date, attachments)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(id, narrativeId, thread_id || null, title, content || '', sort_order || 0, event_date || null, evidence_date || null, attachments || null);
 
     const plotPoint = db.prepare('SELECT * FROM plot_points WHERE id = ?').get(id);
 

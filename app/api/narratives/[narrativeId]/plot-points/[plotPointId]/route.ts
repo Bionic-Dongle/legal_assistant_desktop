@@ -8,16 +8,12 @@ export async function PUT(
   try {
     const { plotPointId } = params;
     const body = await request.json();
-    const { title, content } = body;
-
-    if (!title && !content) {
-      return NextResponse.json({ error: 'Title or content required' }, { status: 400 });
-    }
+    const { title, content, thread_id, event_date, evidence_date, sort_order, attachments } = body;
 
     const updates: string[] = [];
     const values: any[] = [];
 
-    if (title) {
+    if (title !== undefined) {
       updates.push('title = ?');
       values.push(title);
     }
@@ -25,6 +21,35 @@ export async function PUT(
     if (content !== undefined) {
       updates.push('content = ?');
       values.push(content);
+    }
+
+    if (thread_id !== undefined) {
+      updates.push('thread_id = ?');
+      values.push(thread_id);
+    }
+
+    if (event_date !== undefined) {
+      updates.push('event_date = ?');
+      values.push(event_date);
+    }
+
+    if (evidence_date !== undefined) {
+      updates.push('evidence_date = ?');
+      values.push(evidence_date);
+    }
+
+    if (sort_order !== undefined) {
+      updates.push('sort_order = ?');
+      values.push(sort_order);
+    }
+
+    if (attachments !== undefined) {
+      updates.push('attachments = ?');
+      values.push(attachments);
+    }
+
+    if (updates.length === 0) {
+      return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
     }
 
     updates.push('updated_at = CURRENT_TIMESTAMP');

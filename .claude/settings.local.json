@@ -2,7 +2,17 @@
   "permissions": {
     "allow": [
       "Bash(rm:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(npm run dev:*)",
+      "Bash(sqlite3:*)",
+      "Bash(node -e:*)",
+      "Bash(yarn dev)",
+      "Bash(taskkill:*)",
+      "Bash(netstat:*)"
     ],
     "deny": [],
     "ask": []

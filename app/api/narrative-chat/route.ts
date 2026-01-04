@@ -69,9 +69,9 @@ export async function POST(request: Request) {
         contextParts.push(`\nKey Insights:\n${insights.map(i => `- ${i.content}`).join('\n')}`);
       }
 
-      const arguments = db.prepare('SELECT content FROM saved_insights WHERE case_id = ? AND category = ?').all(case_id, 'argument') as any[];
-      if (arguments.length > 0) {
-        contextParts.push(`\nArguments:\n${arguments.map(a => `- ${a.content}`).join('\n')}`);
+      const args = db.prepare('SELECT content FROM saved_insights WHERE case_id = ? AND category = ?').all(case_id, 'argument') as any[];
+      if (args.length > 0) {
+        contextParts.push(`\nArguments:\n${args.map(a => `- ${a.content}`).join('\n')}`);
       }
     }
 
@@ -86,6 +86,9 @@ export async function POST(request: Request) {
 
     // Call OpenAI
     const openai = new OpenAI({ apiKey: openai_key });
+
+    // Get selected model from settings (default to gpt-4o-mini)
+    const selectedModel = settings.openai_model?.trim() || 'gpt-4o-mini';
 
     const systemPrompt = narrative_system_prompt ||
       'You are a legal narrative construction assistant. Help craft compelling, evidence-backed narratives. Focus on clarity, persuasiveness, and logical structure.';
@@ -106,7 +109,7 @@ export async function POST(request: Request) {
     ];
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: selectedModel,
       messages: aiMessages,
       temperature: 0.8,
       top_p: 0.9,

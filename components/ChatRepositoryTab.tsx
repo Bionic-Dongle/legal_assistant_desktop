@@ -14,6 +14,7 @@ interface SavedChatFile {
 export function ChatRepositoryTab() {
   const [chats, setChats] = useState<SavedChatFile[]>([]);
   const [search, setSearch] = useState('');
+  const [selectedChat, setSelectedChat] = useState<SavedChatFile | null>(null);
 
   useEffect(() => {
     loadLocalChats();
@@ -40,7 +41,6 @@ export function ChatRepositoryTab() {
   const filtered = chats.filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase())
   );
-
   return (
     <div className="p-6 h-full overflow-y-auto space-y-6">
       <div className="flex items-center gap-3">
@@ -67,6 +67,7 @@ export function ChatRepositoryTab() {
           <div
             key={chat.name}
             className="flex items-center justify-between p-3 rounded-lg border bg-muted/30 hover:bg-muted/60 transition"
+            title={chat.content?.description || 'No description available'}
           >
             <span>{chat.name}</span>
             <div className="flex gap-2">
@@ -83,10 +84,10 @@ export function ChatRepositoryTab() {
                 onClick={async () => {
                   const result = await window.electronAPI.archiveChat(chat.name);
                   if (result?.success) {
-                    toast.success("Chat archived");
+                    toast.success('Chat archived');
                     setChats((prev) => prev.filter((c) => c.name !== chat.name));
                   } else {
-                    toast.error(result?.error || "Failed to archive chat");
+                    toast.error(result?.error || 'Failed to archive chat');
                   }
                 }}
               >
@@ -98,12 +99,12 @@ export function ChatRepositoryTab() {
                 onClick={async () => {
                   const loaded = await window.electronAPI.loadChat(chat.name);
                   if (loaded?.messages) {
-                    localStorage.setItem("activeChat", JSON.stringify(loaded.messages));
-                    localStorage.setItem("activeSessionId", loaded.sessionId || chat.name);
+                    localStorage.removeItem('activeChat');
+                    localStorage.removeItem('activeSessionId');
                     toast.success(`Opened ${chat.name}`);
-                    window.dispatchEvent(new CustomEvent("chat-loaded", { detail: loaded.messages }));
+                    window.dispatchEvent(new CustomEvent('chat-loaded', { detail: loaded.messages }));
                   } else {
-                    toast.error("Failed to open chat");
+                    toast.error('Failed to open chat');
                   }
                 }}
               >

@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 
 export function SettingsTab() {
   const [openaiKey, setOpenaiKey] = useState('');
+  const [openaiModel, setOpenaiModel] = useState('gpt-4o-mini');
   const [baserowEnabled, setBaserowEnabled] = useState(false);
   const [baserowUrl, setBaserowUrl] = useState('http://localhost:8000');
   const [baserowToken, setBaserowToken] = useState('');
@@ -25,10 +26,11 @@ export function SettingsTab() {
       const res = await fetch('/api/settings');
       const data = await res.json();
       setOpenaiKey(data?.openai_key ?? '');
+      setOpenaiModel(data?.openai_model ?? 'gpt-4o-mini');
       setBaserowEnabled(data?.baserow_enabled === 'true');
       setBaserowUrl(data?.baserow_url ?? 'http://localhost:8000');
       setBaserowToken(data?.baserow_token ?? '');
-      setSystemPromptMain(data?.system_prompt_main ?? data?.custom_system_prompt ?? '');
+      setSystemPromptMain(data?.main_chat_system_prompt ?? data?.system_prompt_main ?? data?.custom_system_prompt ?? '');
       setSystemPromptNarrative(data?.system_prompt_narrative ?? '');
     } catch (error) {
       console.error('Failed to load settings:', error);
@@ -41,13 +43,24 @@ export function SettingsTab() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           openai_key: openaiKey,
+          openai_model: openaiModel,
           baserow_enabled: baserowEnabled.toString(),
           baserow_url: baserowUrl,
           baserow_token: baserowToken,
-          system_prompt_main: systemPromptMain,
+          main_chat_system_prompt: systemPromptMain,
           system_prompt_narrative: systemPromptNarrative,
         }),
       });
+
+      // Immediately update the .env file with the new OpenAI API key
+      if (openaiKey && openaiKey.startsWith('sk-')) {
+        await fetch('/api/env', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: 'OPENAI_API_KEY', value: openaiKey }),
+        });
+      }
+
       toast.success('Settings saved');
     } catch (error) {
       toast.error('Failed to save settings');
@@ -101,7 +114,25 @@ export function SettingsTab() {
               </a>
             </p>
           </div>
-  
+
+          <div className="space-y-2">
+            <Label htmlFor="openai-model">Model</Label>
+            <select
+              id="openai-model"
+              value={openaiModel}
+              onChange={(e) => setOpenaiModel(e?.target?.value ?? 'gpt-4o-mini')}
+              className="w-full border border-border rounded-md p-2 bg-background text-foreground"
+            >
+              <option value="gpt-4o">GPT-4o (Most capable, higher cost)</option>
+              <option value="gpt-4o-mini">GPT-4o Mini (Balanced, recommended)</option>
+              <option value="gpt-4-turbo">GPT-4 Turbo (Previous generation)</option>
+              <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Fastest, lowest cost)</option>
+            </select>
+            <p className="text-sm text-muted-foreground">
+              Choose the OpenAI model to use for chat analysis. GPT-4o Mini offers the best balance of quality and cost.
+            </p>
+          </div>
+
         </div>
 
         {/* System Prompts */}

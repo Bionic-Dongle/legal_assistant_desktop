@@ -41,7 +41,10 @@ export function initDatabase() {
       case_id TEXT NOT NULL,
       filename TEXT NOT NULL,
       filepath TEXT NOT NULL,
-      memory_type TEXT NOT NULL CHECK (memory_type IN ('plaintiff', 'opposition')),
+      memory_type TEXT NOT NULL CHECK (memory_type IN ('plaintiff', 'opposition', 'neutral')),
+      party TEXT DEFAULT 'neutral',
+      knowledge_domain TEXT DEFAULT 'evidence',
+      embedding_present BOOLEAN DEFAULT 0,
       uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
     );
@@ -69,15 +72,33 @@ export function initDatabase() {
       FOREIGN KEY (plot_point_id) REFERENCES plot_points(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS narrative_threads (
+      id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      color TEXT DEFAULT '#6366f1',
+      sort_order INTEGER DEFAULT 0,
+      is_visible BOOLEAN DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS plot_points (
       id TEXT PRIMARY KEY,
       narrative_id TEXT NOT NULL,
+      thread_id TEXT,
       title TEXT NOT NULL,
       content TEXT NOT NULL,
+      event_date TEXT,
+      evidence_date TEXT,
+      attachments TEXT,
       sort_order INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (narrative_id) REFERENCES narratives(id) ON DELETE CASCADE
+      FOREIGN KEY (narrative_id) REFERENCES narratives(id) ON DELETE CASCADE,
+      FOREIGN KEY (thread_id) REFERENCES narrative_threads(id) ON DELETE SET NULL
     );
 
     CREATE TABLE IF NOT EXISTS settings (
@@ -89,7 +110,9 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_evidence_case ON evidence(case_id);
     CREATE INDEX IF NOT EXISTS idx_insights_case ON saved_insights(case_id);
     CREATE INDEX IF NOT EXISTS idx_narratives_case ON narratives(case_id);
+    CREATE INDEX IF NOT EXISTS idx_narrative_threads_case ON narrative_threads(case_id);
     CREATE INDEX IF NOT EXISTS idx_plot_points_narrative ON plot_points(narrative_id);
+    CREATE INDEX IF NOT EXISTS idx_plot_points_thread ON plot_points(thread_id);
     CREATE INDEX IF NOT EXISTS idx_narratives_plot_point ON narratives(plot_point_id);
   `);
 
@@ -116,6 +139,20 @@ export function initDatabase() {
         'Main Narrative',
         'main',
         null
+      );
+    }
+
+    // Ensure each case has at least one narrative thread
+    const threadCount = db.prepare('SELECT COUNT(*) as count FROM narrative_threads WHERE case_id = ?').get(caseRow.id) as { count: number };
+    if (threadCount.count === 0) {
+      const threadId = `thread-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      db.prepare('INSERT INTO narrative_threads (id, case_id, title, description, color, sort_order) VALUES (?, ?, ?, ?, ?, ?)').run(
+        threadId,
+        caseRow.id,
+        'Main Thread',
+        'Primary narrative thread',
+        '#6366f1',
+        0
       );
     }
   }
