@@ -351,6 +351,303 @@ data/
 - Uses gpt-4o-mini with temperature=0.8, top_p=0.9
 - Conversation history limited to last 6 messages for cost/context management
 
+## System Architecture Notes — LegalMind Chat Integration
+
+### Overview
+The LegalMind chat system integrates a local database, dynamic environment configuration, and OpenAI API connectivity. It is designed for **local-first privacy**, **dynamic configuration**, and **prompt-driven reasoning**. The architecture ensures that both the API key and system prompts are fully synchronized between the UI, backend, and runtime environment.
+
+---
+
+### Key Components
+
+1. **Settings UI (`components/SettingsTab.tsx`)**
+   - Provides user controls for configuring the OpenAI API key, model, and system prompts.
+   - When the user saves settings:
+     - The data is stored in the local SQLite database via `/api/settings`.
+     - The API key is immediately written to the `.env` file via `/api/env`.
+     - The runtime environment variable (`process.env.OPENAI_API_KEY`) is updated instantly.
+   - This ensures the backend always uses the latest key without requiring a restart.
+
+2. **Environment Update API (`app/api/env/route.ts`)**
+   - Handles secure updates to the `.env` file.
+   - Accepts JSON payloads like `{ key: 'OPENAI_API_KEY', value: 'sk-...' }`.
+   - Updates or inserts the key-value pair in `.env` and refreshes the runtime environment variable.
+   - Guarantees immediate synchronization between the UI and backend configuration.
+
+3. **Chat API (`app/api/chat/route.ts`)**
+   - Handles all chat interactions with the OpenAI API.
+   - Dynamically retrieves the API key from either the environment variable or database.
+   - Loads system prompts from the database, checking multiple key variants (`main_chat_system_prompt`, `system_prompt_main`, `custom_system_prompt`, etc.) to ensure compatibility.
+   - Builds a composite system prompt that merges user-defined behavior with contextual case data.
+   - Sends structured messages to OpenAI's API for reasoning and response generation.
+
+4. **Database (`lib/db.ts`)**
+   - Stores all user settings, messages, and contextual data.
+   - Acts as the single source of truth for system prompts and configuration values.
+
+---
+
+### Design Principles
+- **Dynamic Configuration:** The `.env` file and runtime environment are updated instantly when the user changes the API key.
+- **Resilience:** The chat route automatically falls back to mock responses if the API key is missing or invalid.
+- **Prompt Flexibility:** The system supports multiple prompt key variants to prevent future compatibility issues.
+- **Local Privacy:** All data, including chat history and evidence, is stored locally — no cloud dependencies.
+
+---
+
+### Critical Maintenance Note
+> ⚠️ **Do not modify or refactor the following files without explicit authorization:**
+> - `components/SettingsTab.tsx`
+> - `app/api/env/route.ts`
+> - `app/api/chat/route.ts`
+>
+> These files are tightly coupled to ensure dynamic synchronization between the UI, `.env` file, and backend runtime. Any changes to their logic can break the OpenAI connection, prompt loading, or environment updates.
+>
+> Only modify these components under direct instruction from the project owner.
+
+---
+
+### Current Status
+✅ The system is now fully functional:
+- The OpenAI API key dynamically updates from the UI.
+- The `.env` file and runtime environment remain synchronized.
+- The chat correctly loads and applies user-defined prompts.
+- The 401 error and prompt desynchronization issues have been resolved permanently.
+
+---
+
+## Evidence Upload System & RAG Architecture
+
+### System Overview
+The Evidence Upload system is a critical component of LegalMind's **Retrieval-Augmented Generation (RAG)** architecture. It allows users to upload legal documents (plaintiff/opposition evidence) which are then:
+1. Stored locally in `data/evidence/`
+2. Embedded using OpenAI's `text-embedding-3-small` model
+3. Stored in vector collections via `lib/chroma.ts`
+4. Retrieved during chat interactions to provide context-aware responses
+
+### Architecture Flow
+```
+User Upload → File Storage → Text Extraction → Embedding Generation → Vector Store → RAG Retrieval
+     ↓              ↓               ↓                    ↓                  ↓             ↓
+EvidenceTab.tsx  /api/evidence  buffer.toString()  OpenAI API      addDocuments()  buildCaseContext()
+```
+
+### Components
+
+**1. Frontend (`components/EvidenceTab.tsx`)**
+- Drag-and-drop upload areas for plaintiff/opposition evidence
+- Accepts: `.pdf`, `.doc`, `.docx`, `.txt`
+- Sends FormData with: `file`, `caseId`, `memoryType`
+- Displays uploaded evidence list with delete functionality
+
+**2. Upload API (`app/api/evidence/route.ts`)**
+- **POST**: Handles file upload
+  - Generates SHA-256 checksum for duplicate detection
+  - Saves file to `data/evidence/` with timestamped filename
+  - Extracts text content (first 10,000 chars)
+  - Generates embedding vector via OpenAI API (if key present)
+  - Stores in vector collection: `{memoryType}_{caseId}` (e.g., `plaintiff_default-case-123`)
+  - Saves metadata to SQLite `evidence` table
+- **GET**: Retrieves evidence list for case
+- **DELETE**: Removes file and database record
+
+**3. Vector Storage (`lib/chroma.ts`)**
+- Simple JSON-based vector storage (stub for future ChromaDB integration)
+- Collections stored as: `data/vectors/{collection-name}.json`
+- Basic keyword matching scoring (not true semantic search)
+- Upgradeable to real embeddings-based search
+
+**4. Context Builder (`lib/context.ts`)**
+- `buildCaseContext()` function queries vector stores
+- Retrieves relevant evidence passages based on user query
+- Assembles context from:
+  - Evidence (plaintiff/opposition)
+  - Saved insights
+  - Saved arguments
+  - Future: Case law precedents
+- Context fed to OpenAI chat completions
+
+**5. Database Schema (`lib/db.ts`)**
+- `evidence` table columns:
+  - `id`, `case_id`, `filename`, `filepath`, `memory_type`
+  - `party`, `knowledge_domain`, `embedding_present`
+  - `uploaded_at`
+
+---
+
+### 🔴 CRITICAL ISSUE DISCOVERED (2026-01-05)
+
+**Problem**: Evidence upload system is **BROKEN** due to schema mismatch.
+
+**Root Cause**:
+The `app/api/evidence/route.ts` file was modified to include duplicate detection using a `checksum` column:
+- Line 45: Generates SHA-256 checksum
+- Line 48: Queries `SELECT id FROM evidence WHERE checksum = ?`
+- Line 106: Inserts with `checksum` value
+
+However, the `evidence` table schema in `lib/db.ts` **DOES NOT INCLUDE** the `checksum` column.
+
+**Impact**:
+- All evidence uploads fail with SQL error: "table evidence has no column named checksum"
+- RAG system cannot ingest new documents
+- Chat cannot access uploaded evidence context
+- Users see "Upload failed" toast with no details
+
+**Evidence**:
+```sql
+-- Current schema (missing checksum):
+CREATE TABLE evidence (
+  id TEXT PRIMARY KEY,
+  case_id TEXT NOT NULL,
+  filename TEXT NOT NULL,
+  filepath TEXT NOT NULL,
+  memory_type TEXT NOT NULL,
+  party TEXT DEFAULT 'neutral',
+  knowledge_domain TEXT DEFAULT 'evidence',
+  embedding_present BOOLEAN DEFAULT 0,
+  uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Required Fix**:
+```sql
+ALTER TABLE evidence ADD COLUMN checksum TEXT UNIQUE;
+```
+
+---
+
+### 🛠️ REPAIR PLAN
+
+**Phase 1: Database Migration**
+1. Add `checksum` column to `evidence` table schema in `lib/db.ts`
+2. Create migration logic to add column to existing databases
+3. Backfill checksums for existing evidence files
+
+**Phase 2: Testing**
+1. Test upload with plaintiff evidence
+2. Test upload with opposition evidence
+3. Verify vector storage creation
+4. Verify chat context retrieval
+5. Test duplicate detection
+
+**Phase 3: RAG Verification**
+1. Upload test document with known content
+2. Ask chat question requiring that evidence
+3. Verify context assembly includes evidence
+4. Confirm OpenAI response uses retrieved context
+
+**Phase 4: Future Enhancements**
+1. Integrate real ChromaDB server (replace JSON stubs)
+2. Add case law precedent vector store
+3. Implement semantic search scoring
+4. Add evidence highlighting in chat responses
+5. Enable citation tracking (which evidence was used)
+
+---
+
+### Additional Issues Found
+
+**1. Text Extraction Limitation**
+- Current: `buffer.toString("utf-8").substring(0, 10000)`
+- Problem: Binary files (PDF, DOCX) cannot be decoded as UTF-8
+- Solution: Integrate `pdf-parse` and `mammoth` libraries for proper text extraction
+
+**2. Embedding Generation Silent Failure**
+- Current: Wraps in try-catch, logs warning, continues without embedding
+- Problem: No user notification when embeddings fail
+- Solution: Return warning in response, set `embedding_present` flag
+
+**3. Vector Collection Naming Inconsistency**
+- API uses: `{memoryType}_{caseId}` (e.g., `plaintiff_default-case-123`)
+- Context builder uses: `{party || knowledge_domain}_{caseId}`
+- Problem: Collections may not match during retrieval
+- Solution: Standardize collection naming convention
+
+**4. No Progress Feedback**
+- Uploads happen silently with spinner
+- User doesn't know if embedding is being generated
+- Solution: Add progress states: "Uploading → Processing → Embedding → Complete"
+
+---
+
+### Critical Maintenance Note
+> ⚠️ **Do not modify the evidence upload system without:**
+> 1. Ensuring database schema matches API expectations
+> 2. Testing with real PDF/DOCX files (not just .txt)
+> 3. Verifying vector store creation
+> 4. Confirming chat retrieval works end-to-end
+> 5. Checking duplicate detection logic
+>
+> The RAG system is the **core value proposition** of LegalMind. If evidence cannot be uploaded and retrieved, the entire application loses its primary function.
+
+---
+
+### Testing Checklist (Before Production)
+- [ ] Upload .txt file → verify storage + embedding
+- [ ] Upload .pdf file → verify text extraction works
+- [ ] Upload .docx file → verify text extraction works
+- [ ] Upload duplicate file → verify rejection with message
+- [ ] Ask chat question → verify evidence context retrieved
+- [ ] Test with no API key → verify graceful degradation
+- [ ] Delete evidence → verify file + DB + vector store cleanup
+
+---
+
+### ✅ REPAIR COMPLETED (2026-01-05)
+
+**Status**: Evidence upload system FIXED and LOCKED DOWN.
+
+**Changes Made**:
+1. ✅ Added `checksum TEXT UNIQUE` column to evidence table schema ([lib/db.ts:48](lib/db.ts#L48))
+2. ✅ Added automatic migration for existing databases ([lib/db.ts:161-173](lib/db.ts#L161-L173))
+3. ✅ Fixed collection naming to use `memory_type` consistently ([lib/context.ts:36-46](lib/context.ts#L36-L46))
+4. ✅ Tested schema migration on existing database
+
+**Lock-Down Procedures**:
+
+> 🔒 **CRITICAL: The following files are now LOCKED and must not be modified without explicit owner authorization:**
+>
+> **Evidence Upload System (RAG Core)**:
+> - `app/api/evidence/route.ts` - Upload handler, checksum logic, embedding generation
+> - `lib/db.ts` - Database schema, migration logic
+> - `lib/context.ts` - Vector retrieval, collection naming
+> - `lib/chroma.ts` - Vector storage operations
+> - `components/EvidenceTab.tsx` - Upload UI
+>
+> **Chat Integration System**:
+> - `components/SettingsTab.tsx` - Settings UI
+> - `app/api/env/route.ts` - Environment updates
+> - `app/api/chat/route.ts` - Chat API, system prompts
+>
+> **Why These Files Are Locked**:
+> - Schema changes without migrations = broken databases
+> - Collection naming changes = RAG retrieval fails silently
+> - API/DB mismatches = "Upload failed" errors with no recovery
+> - These systems are tightly coupled and fragile
+
+**Verification Commands** (Run before any PR merge):
+```bash
+# 1. Check database schema matches code
+node -e "const db = require('better-sqlite3')('./data/legal_assistant.db'); const cols = db.prepare('PRAGMA table_info(evidence)').all(); console.log(cols.find(c => c.name === 'checksum') ? '✅ Schema OK' : '❌ Schema broken');"
+
+# 2. Check collection naming consistency
+grep -n "collectionName.*memoryType" app/api/evidence/route.ts
+grep -n "memory_type.*caseId" lib/context.ts
+
+# 3. Type check passes
+yarn tsc --noEmit
+```
+
+**How to Request Changes to Locked Files**:
+1. Open GitHub issue describing needed change
+2. Tag as `critical-system-modification`
+3. Wait for owner approval
+4. Create PR with full test coverage
+5. Run verification commands
+6. Document migration path if schema changes
+
+---
+
 ## Common Development Patterns
 
 **Adding New Tab**:

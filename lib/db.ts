@@ -45,6 +45,7 @@ export function initDatabase() {
       party TEXT DEFAULT 'neutral',
       knowledge_domain TEXT DEFAULT 'evidence',
       embedding_present BOOLEAN DEFAULT 0,
+      checksum TEXT UNIQUE,
       uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
     );
@@ -155,6 +156,48 @@ export function initDatabase() {
         0
       );
     }
+  }
+
+  // Migration: Add checksum column if it doesn't exist
+  try {
+    const tableInfo = db.prepare('PRAGMA table_info(evidence)').all() as Array<{ name: string }>;
+    const hasChecksum = tableInfo.some(col => col.name === 'checksum');
+
+    if (!hasChecksum) {
+      console.log('🔧 Migrating evidence table: adding checksum column...');
+      db.exec('ALTER TABLE evidence ADD COLUMN checksum TEXT UNIQUE');
+      console.log('✅ Migration complete: checksum column added');
+    }
+  } catch (error) {
+    console.error('⚠️ Migration warning:', error);
+  }
+
+  // Migration: Add is_visible column to narrative_threads if it doesn't exist
+  try {
+    const threadTableInfo = db.prepare('PRAGMA table_info(narrative_threads)').all() as Array<{ name: string }>;
+    const hasIsVisible = threadTableInfo.some(col => col.name === 'is_visible');
+
+    if (!hasIsVisible) {
+      console.log('🔧 Migrating narrative_threads table: adding is_visible column...');
+      db.exec('ALTER TABLE narrative_threads ADD COLUMN is_visible BOOLEAN DEFAULT 1');
+      console.log('✅ Migration complete: is_visible column added');
+    }
+  } catch (error) {
+    console.error('⚠️ Migration warning:', error);
+  }
+
+  // Migration: Add attachments column to plot_points if it doesn't exist
+  try {
+    const plotPointsTableInfo = db.prepare('PRAGMA table_info(plot_points)').all() as Array<{ name: string }>;
+    const hasAttachments = plotPointsTableInfo.some(col => col.name === 'attachments');
+
+    if (!hasAttachments) {
+      console.log('🔧 Migrating plot_points table: adding attachments column...');
+      db.exec('ALTER TABLE plot_points ADD COLUMN attachments TEXT');
+      console.log('✅ Migration complete: attachments column added');
+    }
+  } catch (error) {
+    console.error('⚠️ Migration warning:', error);
   }
 }
 

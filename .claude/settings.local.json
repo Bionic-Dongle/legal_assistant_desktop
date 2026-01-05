@@ -12,7 +12,9 @@
       "Bash(node -e:*)",
       "Bash(yarn dev)",
       "Bash(taskkill:*)",
-      "Bash(netstat:*)"
+      "Bash(netstat:*)",
+      "Bash(dir:*)",
+      "Bash(yarn tsc:*)"
     ],
     "deny": [],
     "ask": []

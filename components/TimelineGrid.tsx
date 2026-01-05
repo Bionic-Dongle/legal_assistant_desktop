@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { DndContext, DragOverlay, closestCenter, closestCorners, PointerSensor, useSensor, useSensors, DragOverEvent } from '@dnd-kit/core';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, addWeeks, addMonths, addQuarters, addYears } from 'date-fns';
 import { TimelineCard } from './TimelineCard';
-import { GripVertical, ChevronRight, ChevronDown } from 'lucide-react';
+import { GripVertical, ChevronRight, ChevronDown, Eye, EyeOff } from 'lucide-react';
 
 interface PlotPoint {
   id: string;
@@ -34,6 +34,7 @@ interface TimelineGridProps {
   onPlotPointClick: (plotPoint: PlotPoint) => void;
   onPlotPointMove: (plotPointId: string, newThreadId: string, newEventDate: string | null) => void;
   onThreadReorder: (activeThreadId: string, overThreadId: string) => void;
+  onThreadVisibilityToggle: (threadId: string, isVisible: boolean) => void;
   zoomLevel: 'year' | 'quarter' | 'month' | 'week';
   dateRange: { start: string; end: string };
 }
@@ -97,6 +98,20 @@ function SortableThreadRow({
           isDragging ? 'opacity-30' : 'opacity-100'
         }`}
       >
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleVisibility?.(thread.id);
+          }}
+          className="hover:bg-accent p-1 rounded"
+          title={thread.is_visible ? 'Hide thread' : 'Show thread'}
+        >
+          {thread.is_visible ? (
+            <Eye className="w-4 h-4 text-muted-foreground" />
+          ) : (
+            <EyeOff className="w-4 h-4 text-muted-foreground" />
+          )}
+        </button>
         <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
           <GripVertical className="w-4 h-4 text-muted-foreground" />
         </div>
@@ -202,6 +217,7 @@ export function TimelineGrid({
   onPlotPointClick,
   onPlotPointMove,
   onThreadReorder,
+  onThreadVisibilityToggle,
   zoomLevel,
   dateRange,
 }: TimelineGridProps) {
@@ -337,9 +353,12 @@ export function TimelineGrid({
     return { dated: groups, undated };
   }, [plotPoints, threads, timePeriods]);
 
-  const visibleThreads = useMemo(() => {
-    // Show all threads for now (is_visible feature can be added later)
-    return threads.sort((a, b) => a.sort_order - b.sort_order);
+  const { visibleThreads, hiddenThreads } = useMemo(() => {
+    const sorted = threads.sort((a, b) => a.sort_order - b.sort_order);
+    return {
+      visibleThreads: sorted.filter(t => t.is_visible),
+      hiddenThreads: sorted.filter(t => !t.is_visible),
+    };
   }, [threads]);
 
   const handleDragStart = (event: any) => {
@@ -463,6 +482,7 @@ export function TimelineGrid({
               <SortableThreadRow
                 key={thread.id}
                 thread={thread}
+                onToggleVisibility={(threadId) => onThreadVisibilityToggle(threadId, false)}
                 isOver={activeThread !== null && overId === thread.id && activeThread.id !== thread.id}
                 isDraggingAnyThread={activeThread !== null}
               >
@@ -479,6 +499,56 @@ export function TimelineGrid({
               </SortableThreadRow>
             ))}
           </SortableContext>
+
+          {/* Hidden threads (shown as thin lines) */}
+          {hiddenThreads.map((thread) => (
+            <React.Fragment key={`hidden-${thread.id}`}>
+              <div
+                style={{
+                  borderLeftColor: thread.color,
+                  borderLeftWidth: '4px',
+                }}
+                className="sticky left-0 z-10 bg-background border-b border-r border-border p-1 flex items-center gap-2"
+              >
+                <button
+                  onClick={() => onThreadVisibilityToggle(thread.id, true)}
+                  className="hover:bg-accent p-1 rounded"
+                  title="Show thread"
+                >
+                  <EyeOff className="w-3 h-3 text-muted-foreground" />
+                </button>
+                <span className="font-medium text-xs text-muted-foreground flex-1">{thread.title}</span>
+              </div>
+              {timePeriods.map((period) => {
+                const plotPointsInPeriod = groupedPlotPoints.dated[thread.id]?.[period.id] || [];
+                const hasPlotPoints = plotPointsInPeriod.length > 0;
+
+                return (
+                  <div
+                    key={`${thread.id}-${period.id}-hidden`}
+                    className="border-b border-r border-border bg-muted/20 relative flex items-center justify-center"
+                    style={{
+                      height: '8px',
+                      borderTopWidth: '2px',
+                      borderTopColor: thread.color,
+                    }}
+                  >
+                    {hasPlotPoints && (
+                      <div
+                        className="absolute rounded-full"
+                        style={{
+                          width: '6px',
+                          height: '6px',
+                          backgroundColor: thread.color,
+                        }}
+                        title={`${plotPointsInPeriod.length} plot point${plotPointsInPeriod.length > 1 ? 's' : ''}`}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </React.Fragment>
+          ))}
 
           {/* Undated plot points sections */}
           {visibleThreads.map((thread) => (
