@@ -71,24 +71,58 @@ export async function queryDocuments(
     return { documents: [[]], metadatas: [[]], distances: [[]] };
   }
   
-  // Simple keyword matching for now
-  // When OpenAI is configured, this can use embeddings
-  const queryLower = queryText.toLowerCase();
-  const scored = collection.map(doc => {
-    const contentLower = doc.content.toLowerCase();
-    const score = queryLower.split(' ').filter(word => 
-      contentLower.includes(word)
-    ).length;
-    return { doc, score };
-  });
-  
+  // Check if embeddings exist in documents
+  const hasEmbeddings = collection.length > 0 && Array.isArray(collection[0].metadata?.embedding);
+
+  let scored: { doc: VectorDoc; score: number }[] = [];
+
+  if (hasEmbeddings) {
+    try {
+      const allSettings = require("@/lib/db")
+        .prepare("SELECT value FROM settings WHERE LOWER(key) = 'openai_api_key'")
+        .get() as { value?: string } | undefined;
+      const apiKey = allSettings?.value?.trim() || process.env.OPENAI_API_KEY;
+      if (apiKey) {
+        const OpenAI = (await import("openai")).default;
+        const openai = new OpenAI({ apiKey });
+        const embedding = await openai.embeddings.create({
+          model: "text-embedding-3-small",
+          input: queryText,
+        });
+        const queryVector = embedding.data[0].embedding as number[];
+
+        scored = collection.map((doc) => {
+          const vector = doc.metadata.embedding as number[];
+          const dot = vector.reduce((sum, v, i) => sum + v * queryVector[i], 0);
+          const magA = Math.sqrt(vector.reduce((sum, v) => sum + v * v, 0));
+          const magB = Math.sqrt(queryVector.reduce((sum, v) => sum + v * v, 0));
+          const similarity = dot / (magA * magB);
+          return { doc, score: similarity };
+        });
+      }
+    } catch (error) {
+      console.error("🧠 Embedding query fallback to keyword: ", error);
+    }
+  }
+
+  // Fallback: keyword overlap scoring if no embeddings or error
+  if (scored.length === 0) {
+    const queryLower = queryText.toLowerCase();
+    scored = collection.map((doc) => {
+      const contentLower = doc.content.toLowerCase();
+      const score = queryLower.split(" ").filter((word) => contentLower.includes(word)).length;
+      return { doc, score };
+    });
+  }
+
+  // Sort by similarity or overlap
   scored.sort((a, b) => b.score - a.score);
   const topDocs = scored.slice(0, nResults);
-  
+
   return {
-    documents: [topDocs.map(item => item.doc.content)],
-    metadatas: [topDocs.map(item => item.doc.metadata)],
-    distances: [topDocs.map(item => 1 - item.score / queryLower.split(' ').length)],
+    documents: [topDocs.map((item) => item.doc.content)],
+    metadatas: [topDocs.map((item) => item.doc.metadata)],
+    distances: [topDocs.map((item) => 1 - (item.score || 0))],
   };
 }
 

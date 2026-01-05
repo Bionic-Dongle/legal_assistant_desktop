@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
-import { Send, Loader2, Save } from 'lucide-react';
+import { Send, Loader2, Save, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Message {
@@ -18,14 +18,46 @@ export function ChatTab({ caseId }: { caseId: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [sessionId] = useState(() => crypto.randomUUID());
+  const [isSavedChat, setIsSavedChat] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const hasLoadedSavedChat = useRef(false);
+  const isLoadingSavedChat = useRef(false);
 
   useEffect(() => {
-    loadMessages();
-  }, [caseId]);
+    const handler = (event: CustomEvent) => {
+      // Prevent any database loading while loading saved chat
+      isLoadingSavedChat.current = true;
+      setMessages(event.detail);
+      setIsSavedChat(true);
+      hasLoadedSavedChat.current = true;
+      // Allow database loading again after a short delay
+      setTimeout(() => {
+        isLoadingSavedChat.current = false;
+      }, 100);
+    };
+    window.addEventListener("chat-loaded", handler as EventListener);
+    return () => {
+      window.removeEventListener("chat-loaded", handler as EventListener);
+    };
+  }, []);
+
+  // Load messages from database only when caseId changes and we're not loading a saved chat
+  useEffect(() => {
+    if (!isLoadingSavedChat.current && !isSavedChat && !hasLoadedSavedChat.current) {
+      loadMessages();
+    }
+  }, [caseId, isSavedChat]);
 
   useEffect(() => {
     messagesEndRef?.current?.scrollIntoView?.({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Persist chat messages to localStorage so it reloads correctly when switching tabs or reopening app
+  useEffect(() => {
+    if (messages?.length) {
+      localStorage.setItem("activeChat", JSON.stringify(messages));
+    }
   }, [messages]);
 
   const loadMessages = async () => {
@@ -90,8 +122,63 @@ export function ChatTab({ caseId }: { caseId: string }) {
     }
   };
 
+  const [showSaveModal, setShowSaveModal] = useState(false);
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
+      {showSaveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="bg-muted p-6 rounded-xl border border-border w-full max-w-md space-y-4">
+            <h2 className="text-xl font-bold">Name Chat</h2>
+            <input
+              type="text"
+              placeholder="Chat name..."
+              className="w-full p-2 rounded border bg-background"
+              id="chatNameInput"
+            />
+            <textarea
+              placeholder="Short description (optional)"
+              className="w-full p-2 rounded border bg-background"
+              id="chatDescInput"
+            />
+            <div className="flex justify-end gap-3 pt-4">
+              <Button variant="outline" onClick={() => setShowSaveModal(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  const nameEl = document.getElementById("chatNameInput") as HTMLInputElement;
+                  const descEl = document.getElementById("chatDescInput") as HTMLTextAreaElement;
+                  const name = nameEl?.value.trim();
+                  const description = descEl?.value.trim();
+                  if (!name) return toast.error("Please name the chat");
+                  try {
+                    const sessionMessages = messages.map(m => ({ ...m, sessionId }));
+                    const result = await window.electronAPI.saveChat({
+                      caseId,
+                      name,
+                      description,
+                      sessionId,
+                      messages: sessionMessages
+                    });
+                    if (result?.success) {
+                      toast.success("Chat saved");
+                      setShowSaveModal(false);
+                    } else {
+                      toast.error(result?.error || "Failed to save");
+                    }
+                  } catch (err) {
+                    console.error("Save error:", err);
+                    toast.error("Error saving chat");
+                  }
+                }}
+              >
+                Save
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {messages?.map?.((msg) => (
           <div
@@ -114,6 +201,14 @@ export function ChatTab({ caseId }: { caseId: string }) {
               </div>
               {msg?.role === 'assistant' && (
                 <div className="flex gap-2 mt-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => navigator.clipboard.writeText(msg.content)}
+                  >
+                    <Save className="w-3 h-3 mr-1" />
+                    Copy to Clipboard
+                  </Button>
                   <Button
                     size="sm"
                     variant="outline"
@@ -147,6 +242,16 @@ export function ChatTab({ caseId }: { caseId: string }) {
 
       <div className="p-6 border-t border-border">
         <div className="flex gap-3">
+          <div className="flex justify-end mb-4">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowSaveModal(true)}
+            >
+              <Save className="w-3 h-3 mr-1" />
+              Save Chat As
+            </Button>
+          </div>
           <Textarea
             value={input}
             onChange={(e) => setInput(e?.target?.value ?? '')}
@@ -171,6 +276,33 @@ export function ChatTab({ caseId }: { caseId: string }) {
             ) : (
               <Send className="w-5 h-5" />
             )}
+          </Button>
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={async () => {
+              try {
+                // Clear messages from database
+                await fetch('/api/messages', {
+                  method: 'DELETE',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ caseId }),
+                });
+
+                // Clear UI state
+                setMessages([]);
+                setIsSavedChat(false);
+                hasLoadedSavedChat.current = false;
+                isLoadingSavedChat.current = false;
+                localStorage.removeItem("activeChat");
+                toast.success("Chat cleared");
+              } catch (error) {
+                console.error("Failed to clear chat:", error);
+                toast.error("Failed to clear chat");
+              }
+            }}
+          >
+            Clear Chat
           </Button>
         </div>
       </div>

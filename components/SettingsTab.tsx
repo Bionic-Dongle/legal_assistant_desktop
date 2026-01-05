@@ -10,9 +10,12 @@ import { toast } from 'sonner';
 
 export function SettingsTab() {
   const [openaiKey, setOpenaiKey] = useState('');
+  const [openaiModel, setOpenaiModel] = useState('gpt-4o-mini');
   const [baserowEnabled, setBaserowEnabled] = useState(false);
   const [baserowUrl, setBaserowUrl] = useState('http://localhost:8000');
   const [baserowToken, setBaserowToken] = useState('');
+  const [systemPromptMain, setSystemPromptMain] = useState('');
+  const [systemPromptNarrative, setSystemPromptNarrative] = useState('');
 
   useEffect(() => {
     loadSettings();
@@ -23,31 +26,16 @@ export function SettingsTab() {
       const res = await fetch('/api/settings');
       const data = await res.json();
       setOpenaiKey(data?.openai_key ?? '');
+      setOpenaiModel(data?.openai_model ?? 'gpt-4o-mini');
       setBaserowEnabled(data?.baserow_enabled === 'true');
       setBaserowUrl(data?.baserow_url ?? 'http://localhost:8000');
       setBaserowToken(data?.baserow_token ?? '');
+      setSystemPromptMain(data?.main_chat_system_prompt ?? data?.system_prompt_main ?? data?.custom_system_prompt ?? '');
+      setSystemPromptNarrative(data?.system_prompt_narrative ?? '');
     } catch (error) {
       console.error('Failed to load settings:', error);
     }
   };
-
-
-    // New state for custom system prompt
-    const [customPrompt, setCustomPrompt] = useState('');
-  
-    useEffect(() => {
-      // Fetch current settings for custom prompt, if available
-      const loadCustomPrompt = async () => {
-        try {
-          const res = await fetch('/api/settings');
-          const data = await res.json();
-          setCustomPrompt(data?.custom_system_prompt ?? '');
-        } catch (error) {
-          console.error('Failed to load custom prompt:', error);
-        }
-      };
-      loadCustomPrompt();
-    }, []);
   const saveSettings = async () => {
     try {
       await fetch('/api/settings', {
@@ -55,12 +43,24 @@ export function SettingsTab() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           openai_key: openaiKey,
+          openai_model: openaiModel,
           baserow_enabled: baserowEnabled.toString(),
           baserow_url: baserowUrl,
           baserow_token: baserowToken,
-          custom_system_prompt: customPrompt,
+          main_chat_system_prompt: systemPromptMain,
+          system_prompt_narrative: systemPromptNarrative,
         }),
       });
+
+      // Immediately update the .env file with the new OpenAI API key
+      if (openaiKey && openaiKey.startsWith('sk-')) {
+        await fetch('/api/env', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: 'OPENAI_API_KEY', value: openaiKey }),
+        });
+      }
+
       toast.success('Settings saved');
     } catch (error) {
       toast.error('Failed to save settings');
@@ -114,19 +114,67 @@ export function SettingsTab() {
               </a>
             </p>
           </div>
-  
-          {/* Custom System Prompt */}
-          <div className="border border-border rounded-lg p-6 space-y-4">
-            <h3 className="text-lg font-semibold">Custom System Prompt</h3>
+
+          <div className="space-y-2">
+            <Label htmlFor="openai-model">Model</Label>
+            <select
+              id="openai-model"
+              value={openaiModel}
+              onChange={(e) => setOpenaiModel(e?.target?.value ?? 'gpt-4o-mini')}
+              className="w-full border border-border rounded-md p-2 bg-background text-foreground"
+            >
+              <option value="gpt-4o">GPT-4o (Most capable, higher cost)</option>
+              <option value="gpt-4o-mini">GPT-4o Mini (Balanced, recommended)</option>
+              <option value="gpt-4-turbo">GPT-4 Turbo (Previous generation)</option>
+              <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Fastest, lowest cost)</option>
+            </select>
             <p className="text-sm text-muted-foreground">
-              Modify LegalMind’s core identity and behavior by providing a personal system prompt addition below.
-              This overlay merges with the backend cognitive base.
+              Choose the OpenAI model to use for chat analysis. GPT-4o Mini offers the best balance of quality and cost.
+            </p>
+          </div>
+
+        </div>
+
+        {/* System Prompts */}
+        <div className="border border-border rounded-lg p-6 space-y-6">
+          <div>
+            <h3 className="text-lg font-semibold mb-2">System Prompts</h3>
+            <p className="text-sm text-muted-foreground">
+              Customize how each chat assistant behaves. These prompts overlay the base AI behavior.
+            </p>
+          </div>
+
+          {/* Main Chat System Prompt */}
+          <div className="space-y-2">
+            <Label htmlFor="prompt-main" className="text-base font-medium">
+              Main Chat System Prompt
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              For strategic case analysis and legal advisory conversations.
             </p>
             <textarea
-              className="w-full min-h-[150px] border border-border rounded-md p-3 text-sm font-mono bg-background text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-              value={customPrompt}
-              onChange={(e) => setCustomPrompt(e?.target?.value ?? '')}
-              placeholder={"Example: You are my private legal strategist. Speak informally and focus on risk analysis."}
+              id="prompt-main"
+              className="w-full min-h-[120px] border border-border rounded-md p-3 text-sm font-mono bg-background text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              value={systemPromptMain}
+              onChange={(e) => setSystemPromptMain(e?.target?.value ?? '')}
+              placeholder="Example: You are my strategic legal advisor. Focus on risk analysis and case weaknesses."
+            />
+          </div>
+
+          {/* Narrative Chat System Prompt */}
+          <div className="space-y-2">
+            <Label htmlFor="prompt-narrative" className="text-base font-medium">
+              Narrative Chat System Prompt
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              For narrative construction and persuasive legal writing assistance.
+            </p>
+            <textarea
+              id="prompt-narrative"
+              className="w-full min-h-[120px] border border-border rounded-md p-3 text-sm font-mono bg-background text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              value={systemPromptNarrative}
+              onChange={(e) => setSystemPromptNarrative(e?.target?.value ?? '')}
+              placeholder="Example: You are a legal writing assistant. Help me craft compelling narratives backed by evidence."
             />
           </div>
         </div>
