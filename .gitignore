@@ -30,10 +30,8 @@ Thumbs.db
 .vscode/
 *.swp
 
-# Database and data storage
-data/**/*.db
-data/**/*.sqlite
-data/**/*.json
+# Database and data storage (entire data folder - contains user evidence, db, vectors)
+data/
 
 # Electron build artifacts
 electron-build/
