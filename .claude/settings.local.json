@@ -12,7 +12,15 @@
       "Bash(node -e:*)",
       "Bash(yarn dev)",
       "Bash(taskkill:*)",
-      "Bash(netstat:*)"
+      "Bash(netstat:*)",
+      "Bash(dir:*)",
+      "Bash(yarn tsc:*)",
+      "Bash(yarn add:*)",
+      "Bash(yarn build:*)",
+      "Bash(powershell:*)",
+      "Bash(node update-contradiction-prompt.js:*)",
+      "Bash(node:*)",
+      "Bash(npx tsc --noEmit)"
     ],
     "deny": [],
     "ask": []

@@ -8,7 +8,7 @@ export async function PUT(
   try {
     const { threadId } = params;
     const body = await request.json();
-    const { title, description, color, sort_order } = body;
+    const { title, description, color, sort_order, is_visible } = body;
 
     const updateFields: string[] = [];
     const updateValues: any[] = [];
@@ -28,6 +28,10 @@ export async function PUT(
     if (sort_order !== undefined) {
       updateFields.push('sort_order = ?');
       updateValues.push(sort_order);
+    }
+    if (is_visible !== undefined) {
+      updateFields.push('is_visible = ?');
+      updateValues.push(is_visible ? 1 : 0);
     }
 
     updateFields.push('updated_at = CURRENT_TIMESTAMP');

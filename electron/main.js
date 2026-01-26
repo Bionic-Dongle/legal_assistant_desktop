@@ -61,6 +61,55 @@ async function createWindow() {
 
   // Developer tools no longer open automatically on launch
 
+  // Enable right-click context menu with spell check
+  mainWindow.webContents.on("context-menu", (event, params) => {
+    const { Menu, MenuItem } = require("electron");
+    const menu = new Menu();
+
+    // Add spell check suggestions if available
+    for (const suggestion of params.dictionarySuggestions) {
+      menu.append(
+        new MenuItem({
+          label: suggestion,
+          click: () => mainWindow.webContents.replaceMisspelling(suggestion),
+        })
+      );
+    }
+
+    // Add separator if there are suggestions
+    if (params.misspelledWord && params.dictionarySuggestions.length > 0) {
+      menu.append(new MenuItem({ type: "separator" }));
+    }
+
+    // Add "Add to dictionary" if word is misspelled
+    if (params.misspelledWord) {
+      menu.append(
+        new MenuItem({
+          label: "Add to Dictionary",
+          click: () =>
+            mainWindow.webContents.session.addWordToSpellCheckerDictionary(
+              params.misspelledWord
+            ),
+        })
+      );
+      menu.append(new MenuItem({ type: "separator" }));
+    }
+
+    // Standard editing commands
+    menu.append(
+      new MenuItem({ label: "Cut", role: "cut", enabled: params.editFlags.canCut })
+    );
+    menu.append(
+      new MenuItem({ label: "Copy", role: "copy", enabled: params.editFlags.canCopy })
+    );
+    menu.append(
+      new MenuItem({ label: "Paste", role: "paste", enabled: params.editFlags.canPaste })
+    );
+
+    // Show menu at cursor position
+    menu.popup();
+  });
+
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
@@ -155,6 +204,17 @@ ipcMain.handle("archive-chat", async (event, filename) => {
     return { success: true, path: destPath };
   } catch (err) {
     console.error("Failed to archive chat", err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle("open-file", async (event, filepath) => {
+  try {
+    const { shell } = require("electron");
+    await shell.openPath(filepath);
+    return { success: true };
+  } catch (err) {
+    console.error("Failed to open file", err);
     return { success: false, error: err.message };
   }
 });

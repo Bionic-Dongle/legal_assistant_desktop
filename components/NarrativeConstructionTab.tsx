@@ -8,6 +8,7 @@ import { InputModal } from './InputModal';
 import { TimelineGrid } from './TimelineGrid';
 import { TimelineToolbar } from './TimelineToolbar';
 import { PlotPointEditModal } from './PlotPointEditModal';
+import { TimelineChatPanel } from './TimelineChatPanel';
 
 interface Thread {
   id: string;
@@ -158,8 +159,9 @@ export function NarrativeConstructionTab({ caseId }: { caseId: string }) {
         toast.success('Plot point created');
       }
 
-      loadPlotPoints();
+      await loadPlotPoints();
     } catch (error) {
+      console.error('Failed to save plot point:', error);
       toast.error('Failed to save plot point');
       throw error;
     }
@@ -184,6 +186,19 @@ export function NarrativeConstructionTab({ caseId }: { caseId: string }) {
       loadPlotPoints();
     } catch (error) {
       toast.error('Failed to move plot point');
+    }
+  };
+
+  const handlePlotPointDelete = async (plotPointId: string) => {
+    try {
+      await fetch(`/api/narratives/${mainNarrativeId}/plot-points/${plotPointId}`, {
+        method: 'DELETE',
+      });
+
+      toast.success('Plot point deleted');
+      loadPlotPoints();
+    } catch (error) {
+      toast.error('Failed to delete plot point');
     }
   };
 
@@ -222,20 +237,18 @@ export function NarrativeConstructionTab({ caseId }: { caseId: string }) {
     }
   };
 
-  const handleToggleThreadVisibility = async (threadId: string) => {
+  const handleToggleThreadVisibility = async (threadId: string, isVisible: boolean) => {
     try {
-      const thread = threads.find(t => t.id === threadId);
-      if (!thread) return;
-
       await fetch(`/api/narrative-threads/${threadId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          is_visible: !thread.is_visible,
+          is_visible: isVisible,
         }),
       });
 
-      loadThreads();
+      await loadThreads();
+      await loadPlotPoints();
     } catch (error) {
       toast.error('Failed to toggle thread visibility');
     }
@@ -302,7 +315,9 @@ export function NarrativeConstructionTab({ caseId }: { caseId: string }) {
             threads={threads}
             onPlotPointClick={handleEditPlotPoint}
             onPlotPointMove={handlePlotPointMove}
+            onPlotPointDelete={handlePlotPointDelete}
             onThreadReorder={handleThreadReorder}
+            onThreadVisibilityToggle={handleToggleThreadVisibility}
             zoomLevel={zoomLevel}
             dateRange={dateRange}
           />
@@ -326,8 +341,20 @@ export function NarrativeConstructionTab({ caseId }: { caseId: string }) {
         }}
         onSave={handleSavePlotPoint}
         plotPoint={selectedPlotPoint}
-        threads={threads.filter(t => t.is_visible)}
+        threads={threads}
+        caseId={caseId}
       />
+
+      {/* Timeline Chat Panel */}
+      {mainNarrativeId && (
+        <TimelineChatPanel
+          caseId={caseId}
+          narrativeId={mainNarrativeId}
+          plotPoints={plotPoints}
+          threads={threads}
+          onRefreshTimeline={loadPlotPoints}
+        />
+      )}
     </div>
   );
 }

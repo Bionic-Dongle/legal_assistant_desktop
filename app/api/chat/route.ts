@@ -89,40 +89,146 @@ export async function POST(request: Request) {
 Maintain two cognitive modes:
 • **Analytical Mode** — precise, logical reasoning grounded in evidence and law.
 • **Conversational Mode** — flexible, contextually aware, adapting tone to human dialogue history.
-Prioritize factual grounding, but sustain continuity with the user’s ongoing narrative.`;
+Prioritize factual grounding, but sustain continuity with the user's ongoing narrative.
+
+🚨 CRITICAL CITATION PROTOCOL - STRICT ENFORCEMENT:
+
+**RULE 1: VERIFY BEFORE CITING**
+Before creating any citation [📄 filename] "quote", you MUST verify that the EXACT quote exists in that specific document.
+- Check the document content carefully
+- Match the quote word-for-word
+- If unsure, DO NOT cite - ask the user to clarify
+
+**RULE 2: CORRECT DOCUMENT ATTRIBUTION**
+Each quote MUST be paired with the correct source document:
+❌ WRONG: Quoting from "Hargreaves vs Mulligan.txt" but citing [📄 defence.txt]
+✅ RIGHT: Read the evidence context, find which document contains the quote, cite that exact document
+
+**RULE 3: NO PARAPHRASING IN CITATIONS**
+Citations must be VERBATIM excerpts from the source:
+❌ WRONG: [📄 defense.txt] "defendant denies malicious conduct"
+✅ RIGHT: [📄 defense.txt] "The Defendant denies doing so out of malice, spite, or horticultural ignorance."
+
+**RULE 4: CITATION FORMAT (MUST FOLLOW EXACTLY)**
+[📄 exact-filename.txt] "exact verbatim quote from the document"
+
+The [📄 filename] becomes a clickable link that opens the document and highlights the quote.
+If the quote is not in the document you cite, the system will show an error to the user.
+
+**RULE 5: CROSS-CHECK YOUR WORK**
+Before responding with citations:
+1. Read the evidence context provided below
+2. Note which document contains which information
+3. Copy exact quotes - do not reword
+4. Match each quote to its source document
+5. Format as [📄 filename] "exact quote"
+
+EXAMPLES:
+❌ WRONG: "The defense claims you deliberately poisoned the tree."
+✅ RIGHT: [📄 defence.txt] "The Defendant did not confine his actions to pruning or lawful removal of roots and instead applied a chemical agent capable of systemic absorption."
+
+❌ WRONG: Citing multiple quotes from different documents under one filename
+✅ RIGHT: Each quote gets its own citation with the correct source document
+
+When user asks "What do they accuse me of?" - carefully read the evidence context, identify the correct source document for each accusation, and cite each one separately with exact quotes.`;
       }
 
       // --- Multi‑repository context assembly ---
       const insights = db.prepare("SELECT content, created_at FROM saved_insights WHERE case_id = ? AND category = 'insight' ORDER BY created_at DESC").all(caseId);
       const argumentsSet = db.prepare("SELECT content, created_at FROM saved_insights WHERE case_id = ? AND category = 'argument' ORDER BY created_at DESC").all(caseId);
 
+      // Load evidence with Upload Bot metadata
+      const evidence = db.prepare(`
+        SELECT filename, uploaded_at, memory_type,
+               document_type, actual_author, submitted_by_party,
+               user_context_notes, defense_strategy, user_counter_narrative,
+               strategic_summary, extracted_text
+        FROM evidence
+        WHERE case_id = ? AND extracted_text IS NOT NULL
+        ORDER BY uploaded_at DESC
+      `).all(caseId) as any[];
+
       const insightsContext = (insights as any[]).map((i: any) => `• (${i.created_at}) ${i.content}`).join("\n") || "No saved insights yet.";
       const argumentsContext = (argumentsSet as any[]).map((a: any) => `• (${a.created_at}) ${a.content}`).join("\n") || "No saved arguments yet.";
 
-      // --- Assemble final system prompt ---
-      const systemPrompt = `${baseSystemPrompt}
+      const evidenceContext = evidence.length > 0
+        ? evidence.map((ev: any) => {
+            const parts: string[] = [];
+            parts.push(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+            parts.push(`📄 DOCUMENT: ${ev.filename}`);
+            parts.push(`⚠️ CITATION REQUIREMENT: When quoting from this document, you MUST cite as [📄 ${ev.filename}]`);
+            parts.push(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+            parts.push(`Type: ${ev.memory_type}`);
+            if (ev.document_type) parts.push(`Document Type: ${ev.document_type}`);
+            if (ev.actual_author) parts.push(`Author: ${ev.actual_author}`);
+            if (ev.submitted_by_party) parts.push(`Submitted By: ${ev.submitted_by_party}`);
+            if (ev.user_context_notes) parts.push(`User Notes: ${ev.user_context_notes.substring(0, 200)}${ev.user_context_notes.length > 200 ? '...' : ''}`);
+            if (ev.strategic_summary) parts.push(`Summary: ${ev.strategic_summary.substring(0, 150)}${ev.strategic_summary.length > 150 ? '...' : ''}`);
 
-### Case Context (memory from buildCaseContext)
-${context || "No contextual data yet."}
+            // Add line-numbered content for citation
+            if (ev.extracted_text) {
+              const lines = ev.extracted_text.split('\n');
+              const numberedLines = lines.slice(0, 100).map((line: string, idx: number) => `${idx + 1}: ${line}`).join('\n');
+              parts.push(`\n📝 CONTENT (quotes from this section MUST cite [📄 ${ev.filename}]):\n${numberedLines}`);
+              if (lines.length > 100) parts.push(`... [${lines.length - 100} more lines]`);
+            }
+
+            return parts.join('\n');
+          }).join('\n\n')
+        : "No evidence uploaded yet.";
+
+      // --- Assemble final system prompt ---
+      const systemPrompt = `🚨🚨🚨 CRITICAL CITATION RULES - ZERO TOLERANCE 🚨🚨🚨
+
+**RULE: COPY-PASTE ONLY - NO PARAPHRASING**
+When the user asks "what does X say about Y?", you MUST:
+1. Find the EXACT text in the document (use Ctrl+F mentally)
+2. COPY it character-for-character - do NOT reword, summarize, or paraphrase
+3. Cite it as [📄 filename] "exact copied text"
+
+❌ WRONG (paraphrasing): [📄 defence.txt] "The defendant denies wrongdoing"
+✅ RIGHT (exact quote): [📄 defence.txt] "The Defendant denies each and every allegation contained in the Statement of Claim."
+
+**IF YOU CANNOT FIND THE EXACT WORDING:**
+- Say: "I don't see that exact phrasing in the document. Here's what I found: [📄 filename] 'actual quote'"
+- NEVER make up quotes or paraphrase
+
+**VERIFICATION TEST:**
+Before responding, ask yourself: "Can I Ctrl+F and find this exact quote in the document?"
+If NO → Don't use that quote. Find actual text or say you can't find it.
+
+EVERY SINGLE TIME you quote evidence, use format: [📄 filename] "exact verbatim quote"
+THIS IS NOT OPTIONAL. THIS IS MANDATORY. NO EXCEPTIONS.
+
+${baseSystemPrompt}
 
 ### Repositories
-1. Evidence Repository — documents.
+1. Evidence Repository — uploaded documents with conversational metadata from Upload Bot.
 2. Insights Repository — conceptual/legal reasoning.
-3. Arguments Repository — structured positions.
+3. Arguments Repository — structured legal positions.
 
 Your goals:
 - Interpret user intent across all repositories.
 - Ask clarifying questions when ambiguous.
 - Maintain continuity across recent chat turns.
+- When referencing evidence, acknowledge the metadata (author, submitter, user context).
 
-### Evidence Context
-${context || "No evidence currently loaded."}
+### Evidence Repository
+⚠️ CITATION ACCURACY REMINDER: Each document below has a filename. When you cite a quote, the [📄 filename] MUST match the document where that quote actually appears. The user can click these citations to verify - if you cite the wrong document, it will be immediately obvious. Cross-check carefully!
+
+${evidenceContext}
 
 ### Key Insights
 ${insightsContext}
 
 ### Saved Arguments
 ${argumentsContext}
+
+### Vector Search Results (semantic retrieval)
+${context || "No vector search results for this query."}
+
+🚨 REMINDER: When quoting from evidence, you MUST use the citation format: [📄 filename] "exact quote"
+This is NON-NEGOTIABLE. Every quote from evidence MUST be cited with the [📄 filename] format.
 `;
 
       if (!apiKey) {

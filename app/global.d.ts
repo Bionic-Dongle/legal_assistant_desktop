@@ -11,5 +11,8 @@ declare global {
       loadChat: (filename: string) => Promise<any>;
       archiveChat: (filename: string) => Promise<{ success: boolean; path?: string; error?: string }>;
     };
+    electron?: {
+      openFile: (filepath: string) => void;
+    };
   }
 }

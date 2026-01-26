@@ -33,15 +33,15 @@ export async function buildCaseContext(
   if (includeEvidence) {
     try {
       const filters = db.prepare(
-        "SELECT DISTINCT party, knowledge_domain FROM evidence WHERE case_id = ?"
+        "SELECT DISTINCT memory_type FROM evidence WHERE case_id = ?"
       ).all(caseId) as any[];
 
       const byParty: Record<string, string[]> = {};
       for (const row of filters) {
-        const collection = `${row.party || row.knowledge_domain || "neutral"}_${caseId}`;
+        const collection = `${row.memory_type}_${caseId}`;
         const results = await queryDocuments(collection, query, maxResults);
         if (results?.documents?.[0]?.length) {
-          const title = `${row.party ? row.party.charAt(0).toUpperCase() + row.party.slice(1) : "Neutral"} - ${row.knowledge_domain || "Evidence"}`;
+          const title = `${row.memory_type.charAt(0).toUpperCase() + row.memory_type.slice(1)} Evidence`;
           byParty[title] = results.documents[0];
         }
       }
