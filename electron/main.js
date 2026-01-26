@@ -207,3 +207,14 @@ ipcMain.handle("archive-chat", async (event, filename) => {
     return { success: false, error: err.message };
   }
 });
+
+ipcMain.handle("open-file", async (event, filepath) => {
+  try {
+    const { shell } = require("electron");
+    await shell.openPath(filepath);
+    return { success: true };
+  } catch (err) {
+    console.error("Failed to open file", err);
+    return { success: false, error: err.message };
+  }
+});

@@ -1,11 +1,12 @@
 
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { Send, Loader2, Save, Copy } from 'lucide-react';
 import { toast } from 'sonner';
+import { DocumentViewerModal } from './DocumentViewerModal';
 
 interface Message {
   id: string;
@@ -23,6 +24,11 @@ export function ChatTab({ caseId }: { caseId: string }) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasLoadedSavedChat = useRef(false);
   const isLoadingSavedChat = useRef(false);
+
+  // Document viewer state
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerFilename, setViewerFilename] = useState('');
+  const [viewerQuote, setViewerQuote] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     const handler = (event: CustomEvent) => {
@@ -122,6 +128,113 @@ export function ChatTab({ caseId }: { caseId: string }) {
     }
   };
 
+  // Parse citations and render clickable links
+  const renderMessageWithCitations = (content: string) => {
+    // Pattern 1: [📄 filename] "quote" or [Cite: 📄 filename] or [Cited from: 📄 filename] "quote"
+    // Pattern 2: "quote" ■ filename.txt (reverse format)
+    // Pattern 3: [📄 filename] without brackets sometimes
+    const citationPattern1 = /\[(?:Cite[d]?(?:\s+from)?:\s*)?📄\s+([^\]]+)\](?:\s+"([^"]+)")?/g;
+    const citationPattern2 = /"([^"]+)"\s*■\s*([^\s]+\.txt)/gi;
+    const citationPattern3 = /📄\s+([^\s]+\.txt)/gi;
+
+    const parts: (string | React.ReactElement)[] = [];
+    const citations: Array<{ index: number; filename: string; quote?: string; length: number }> = [];
+
+    // Find all Pattern 1 citations
+    let match1;
+    while ((match1 = citationPattern1.exec(content)) !== null) {
+      citations.push({
+        index: match1.index,
+        filename: match1[1].trim(),
+        quote: match1[2] ? match1[2].trim() : undefined,
+        length: match1[0].length
+      });
+    }
+
+    // Find all Pattern 2 citations (reverse format: "quote" ■ filename.txt)
+    let match2;
+    while ((match2 = citationPattern2.exec(content)) !== null) {
+      citations.push({
+        index: match2.index,
+        quote: match2[1].trim(),
+        filename: match2[2].trim(),
+        length: match2[0].length
+      });
+    }
+
+    // Find all Pattern 3 citations (just 📄 filename.txt without brackets)
+    // Also try to extract preceding text as the quote
+    let match3;
+    while ((match3 = citationPattern3.exec(content)) !== null) {
+      // Don't add if this position is already covered by another pattern
+      const alreadyCovered = citations.some(c =>
+        match3!.index >= c.index && match3!.index < c.index + c.length
+      );
+      if (!alreadyCovered) {
+        // Look backwards for text that might be the quote
+        // Find the start of the current paragraph/sentence
+        const textBefore = content.substring(0, match3.index);
+        let quote: string | undefined = undefined;
+
+        // Try to find preceding text on same line or paragraph
+        const lastNewlineIdx = textBefore.lastIndexOf('\n\n');
+        const lastPeriodIdx = textBefore.lastIndexOf('. ');
+        const startIdx = Math.max(lastNewlineIdx + 2, 0);
+
+        if (startIdx < match3.index) {
+          const precedingText = textBefore.substring(startIdx).trim();
+          // Only use as quote if it's substantial (more than 20 chars)
+          if (precedingText.length > 20) {
+            quote = precedingText;
+          }
+        }
+
+        citations.push({
+          index: match3.index,
+          filename: match3[1].trim(),
+          quote: quote,
+          length: match3[0].length
+        });
+      }
+    }
+
+    // Sort by index
+    citations.sort((a, b) => a.index - b.index);
+
+    let lastIndex = 0;
+    citations.forEach((citation, idx) => {
+      // Add text before citation
+      if (citation.index > lastIndex) {
+        parts.push(content.substring(lastIndex, citation.index));
+      }
+
+      // Add clickable citation
+      parts.push(
+        <span
+          key={citation.index}
+          className="inline-flex items-center gap-1 cursor-pointer text-blue-600 dark:text-blue-400 hover:underline"
+          onClick={() => {
+            console.log('[Citation clicked]', citation.filename, 'quote:', citation.quote?.substring(0, 50));
+            setViewerFilename(citation.filename);
+            setViewerQuote(citation.quote);
+            setViewerOpen(true);
+          }}
+        >
+          📄 {citation.filename}
+        </span>
+      );
+
+      lastIndex = citation.index + citation.length;
+    });
+
+    // Add remaining text
+    if (lastIndex < content.length) {
+      parts.push(content.substring(lastIndex));
+    }
+
+    return parts.length > 0 ? parts : content;
+  };
+
   const [showSaveModal, setShowSaveModal] = useState(false);
 
   return (
@@ -196,7 +309,7 @@ export function ChatTab({ caseId }: { caseId: string }) {
                 }`}
               >
                 <p className="whitespace-pre-wrap text-base leading-relaxed">
-                  {msg?.content}
+                  {msg?.role === 'assistant' ? renderMessageWithCitations(msg?.content) : msg?.content}
                 </p>
               </div>
               {msg?.role === 'assistant' && (
@@ -306,6 +419,15 @@ export function ChatTab({ caseId }: { caseId: string }) {
           </Button>
         </div>
       </div>
+
+      {/* Document Viewer Modal */}
+      <DocumentViewerModal
+        filename={viewerFilename}
+        quote={viewerQuote}
+        caseId={caseId}
+        isOpen={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+      />
     </div>
   );
 }

@@ -33,6 +33,7 @@ interface TimelineGridProps {
   threads: Thread[];
   onPlotPointClick: (plotPoint: PlotPoint) => void;
   onPlotPointMove: (plotPointId: string, newThreadId: string, newEventDate: string | null) => void;
+  onPlotPointDelete: (plotPointId: string) => void;
   onThreadReorder: (activeThreadId: string, overThreadId: string) => void;
   onThreadVisibilityToggle: (threadId: string, isVisible: boolean) => void;
   zoomLevel: 'year' | 'quarter' | 'month' | 'week';
@@ -130,12 +131,14 @@ function GridCell({
   plotPoints,
   threadColor,
   onPlotPointClick,
+  onPlotPointDelete,
 }: {
   threadId: string;
   period: TimePeriod;
   plotPoints: PlotPoint[];
   threadColor: string;
   onPlotPointClick: (plotPoint: PlotPoint) => void;
+  onPlotPointDelete: (plotPointId: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `${threadId}-${period.id}`,
@@ -159,6 +162,7 @@ function GridCell({
           plotPoint={pp}
           threadColor={threadColor}
           onClick={() => onPlotPointClick(pp)}
+          onDelete={onPlotPointDelete}
         />
       ))}
     </div>
@@ -169,12 +173,14 @@ function UndatedPlotPointsSection({
   thread,
   plotPoints,
   onPlotPointClick,
+  onPlotPointDelete,
   isExpanded,
   onToggle,
 }: {
   thread: Thread;
   plotPoints: PlotPoint[];
   onPlotPointClick: (plotPoint: PlotPoint) => void;
+  onPlotPointDelete: (plotPointId: string) => void;
   isExpanded: boolean;
   onToggle: () => void;
 }) {
@@ -202,6 +208,7 @@ function UndatedPlotPointsSection({
                 plotPoint={pp}
                 threadColor={thread.color}
                 onClick={() => onPlotPointClick(pp)}
+                onDelete={onPlotPointDelete}
               />
             ))}
           </div>
@@ -216,6 +223,7 @@ export function TimelineGrid({
   threads,
   onPlotPointClick,
   onPlotPointMove,
+  onPlotPointDelete,
   onThreadReorder,
   onThreadVisibilityToggle,
   zoomLevel,
@@ -494,6 +502,7 @@ export function TimelineGrid({
                     plotPoints={groupedPlotPoints.dated[thread.id]?.[period.id] || []}
                     threadColor={thread.color}
                     onPlotPointClick={onPlotPointClick}
+                    onPlotPointDelete={onPlotPointDelete}
                   />
                 ))}
               </SortableThreadRow>
@@ -557,6 +566,7 @@ export function TimelineGrid({
               thread={thread}
               plotPoints={groupedPlotPoints.undated[thread.id] || []}
               onPlotPointClick={onPlotPointClick}
+              onPlotPointDelete={onPlotPointDelete}
               isExpanded={expandedUndatedSections.has(thread.id)}
               onToggle={() => toggleUndatedSection(thread.id)}
             />

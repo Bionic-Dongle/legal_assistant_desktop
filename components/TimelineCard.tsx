@@ -1,7 +1,7 @@
 'use client';
 
 import { useDraggable } from '@dnd-kit/core';
-import { Paperclip } from 'lucide-react';
+import { Paperclip, X } from 'lucide-react';
 
 interface TimelineCardProps {
   plotPoint: {
@@ -16,9 +16,10 @@ interface TimelineCardProps {
   };
   threadColor: string;
   onClick: () => void;
+  onDelete?: (plotPointId: string) => void;
 }
 
-export function TimelineCard({ plotPoint, threadColor, onClick }: TimelineCardProps) {
+export function TimelineCard({ plotPoint, threadColor, onClick, onDelete }: TimelineCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: plotPoint.id,
     data: {
@@ -59,18 +60,36 @@ export function TimelineCard({ plotPoint, threadColor, onClick }: TimelineCardPr
     }
   })() : 0;
 
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering onClick
+    if (onDelete && confirm(`Delete "${plotPoint.title}"?`)) {
+      onDelete(plotPoint.id);
+    }
+  };
+
   return (
     <div
       ref={setNodeRef}
       {...listeners}
       {...attributes}
       onClick={onClick}
-      className="p-3 rounded-md border-2 cursor-pointer hover:shadow-md transition-shadow bg-background"
+      className="group p-3 rounded-md border-2 cursor-pointer hover:shadow-md transition-shadow bg-background relative"
       style={{
         borderColor: threadColor,
         ...style,
       }}
     >
+      {/* Delete button - appears on hover */}
+      {onDelete && (
+        <button
+          onClick={handleDelete}
+          className="absolute top-1 right-1 w-5 h-5 rounded-sm bg-destructive/90 text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-destructive z-10"
+          title="Delete plot point"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      )}
+
       <div className="flex items-start justify-between gap-2 mb-1">
         <div className="font-semibold text-sm line-clamp-2 flex-1">{plotPoint.title}</div>
         {hasAttachments && (

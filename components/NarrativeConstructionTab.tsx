@@ -8,6 +8,7 @@ import { InputModal } from './InputModal';
 import { TimelineGrid } from './TimelineGrid';
 import { TimelineToolbar } from './TimelineToolbar';
 import { PlotPointEditModal } from './PlotPointEditModal';
+import { TimelineChatPanel } from './TimelineChatPanel';
 
 interface Thread {
   id: string;
@@ -188,6 +189,19 @@ export function NarrativeConstructionTab({ caseId }: { caseId: string }) {
     }
   };
 
+  const handlePlotPointDelete = async (plotPointId: string) => {
+    try {
+      await fetch(`/api/narratives/${mainNarrativeId}/plot-points/${plotPointId}`, {
+        method: 'DELETE',
+      });
+
+      toast.success('Plot point deleted');
+      loadPlotPoints();
+    } catch (error) {
+      toast.error('Failed to delete plot point');
+    }
+  };
+
   const handleThreadReorder = async (activeThreadId: string, overThreadId: string) => {
     try {
       // Find the threads
@@ -301,6 +315,7 @@ export function NarrativeConstructionTab({ caseId }: { caseId: string }) {
             threads={threads}
             onPlotPointClick={handleEditPlotPoint}
             onPlotPointMove={handlePlotPointMove}
+            onPlotPointDelete={handlePlotPointDelete}
             onThreadReorder={handleThreadReorder}
             onThreadVisibilityToggle={handleToggleThreadVisibility}
             zoomLevel={zoomLevel}
@@ -329,6 +344,17 @@ export function NarrativeConstructionTab({ caseId }: { caseId: string }) {
         threads={threads}
         caseId={caseId}
       />
+
+      {/* Timeline Chat Panel */}
+      {mainNarrativeId && (
+        <TimelineChatPanel
+          caseId={caseId}
+          narrativeId={mainNarrativeId}
+          plotPoints={plotPoints}
+          threads={threads}
+          onRefreshTimeline={loadPlotPoints}
+        />
+      )}
     </div>
   );
 }

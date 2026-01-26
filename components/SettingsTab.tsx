@@ -16,6 +16,11 @@ export function SettingsTab() {
   const [baserowToken, setBaserowToken] = useState('');
   const [systemPromptMain, setSystemPromptMain] = useState('');
   const [systemPromptNarrative, setSystemPromptNarrative] = useState('');
+  const [systemPromptTimeline, setSystemPromptTimeline] = useState('');
+  const [globalRules, setGlobalRules] = useState('');
+  const [anthropicKey, setAnthropicKey] = useState('');
+  const [claudeModel, setClaudeModel] = useState('claude-3-5-sonnet-20241022');
+  const [timelineApiPreference, setTimelineApiPreference] = useState('openai');
 
   useEffect(() => {
     loadSettings();
@@ -32,6 +37,11 @@ export function SettingsTab() {
       setBaserowToken(data?.baserow_token ?? '');
       setSystemPromptMain(data?.main_chat_system_prompt ?? data?.system_prompt_main ?? data?.custom_system_prompt ?? '');
       setSystemPromptNarrative(data?.system_prompt_narrative ?? '');
+      setSystemPromptTimeline(data?.system_prompt_timeline ?? '');
+      setGlobalRules(data?.global_rules ?? '');
+      setAnthropicKey(data?.anthropic_api_key ?? '');
+      setClaudeModel(data?.claude_model ?? 'claude-3-5-sonnet-20241022');
+      setTimelineApiPreference(data?.timeline_api_preference ?? 'openai');
     } catch (error) {
       console.error('Failed to load settings:', error);
     }
@@ -49,6 +59,11 @@ export function SettingsTab() {
           baserow_token: baserowToken,
           main_chat_system_prompt: systemPromptMain,
           system_prompt_narrative: systemPromptNarrative,
+          system_prompt_timeline: systemPromptTimeline,
+          global_rules: globalRules,
+          anthropic_api_key: anthropicKey,
+          claude_model: claudeModel,
+          timeline_api_preference: timelineApiPreference,
         }),
       });
 
@@ -58,6 +73,15 @@ export function SettingsTab() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ key: 'OPENAI_API_KEY', value: openaiKey }),
+        });
+      }
+
+      // Immediately update the .env file with the new Anthropic API key
+      if (anthropicKey && anthropicKey.startsWith('sk-')) {
+        await fetch('/api/env', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: 'ANTHROPIC_API_KEY', value: anthropicKey }),
         });
       }
 
@@ -135,6 +159,71 @@ export function SettingsTab() {
 
         </div>
 
+        {/* Claude/Anthropic Settings */}
+        <div className="border border-border rounded-lg p-6 space-y-4">
+          <h3 className="text-lg font-semibold">Claude (Anthropic) Configuration</h3>
+          <div className="space-y-2">
+            <Label htmlFor="anthropic-key">API Key</Label>
+            <Input
+              id="anthropic-key"
+              type="password"
+              value={anthropicKey}
+              onChange={(e) => setAnthropicKey(e?.target?.value ?? '')}
+              placeholder="sk-ant-..."
+            />
+            <p className="text-sm text-muted-foreground">
+              Your Anthropic API key for Claude AI. Get one at{' '}
+              <a
+                href="https://console.anthropic.com/settings/keys"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                console.anthropic.com
+              </a>
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="claude-model">Model</Label>
+            <select
+              id="claude-model"
+              value={claudeModel}
+              onChange={(e) => setClaudeModel(e?.target?.value ?? 'claude-3-5-sonnet-20241022')}
+              className="w-full border border-border rounded-md p-2 bg-background text-foreground"
+            >
+              <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Recommended)</option>
+              <option value="claude-3-opus-20240229">Claude 3 Opus (Most capable)</option>
+              <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
+              <option value="claude-3-haiku-20240307">Claude 3 Haiku (Fastest)</option>
+            </select>
+            <p className="text-sm text-muted-foreground">
+              Choose the Claude model. Claude 3.5 Sonnet offers excellent performance.
+            </p>
+          </div>
+        </div>
+
+        {/* Timeline Chat Settings */}
+        <div className="border border-border rounded-lg p-6 space-y-4">
+          <h3 className="text-lg font-semibold">Timeline Chat Preferences</h3>
+
+          <div className="space-y-2">
+            <Label htmlFor="timeline-api">Preferred AI Provider</Label>
+            <select
+              id="timeline-api"
+              value={timelineApiPreference}
+              onChange={(e) => setTimelineApiPreference(e?.target?.value ?? 'openai')}
+              className="w-full border border-border rounded-md p-2 bg-background text-foreground"
+            >
+              <option value="openai">OpenAI (GPT)</option>
+              <option value="claude">Claude (Anthropic)</option>
+            </select>
+            <p className="text-sm text-muted-foreground">
+              Choose which AI provider to use for the Timeline Assistant chat.
+            </p>
+          </div>
+        </div>
+
         {/* System Prompts */}
         <div className="border border-border rounded-lg p-6 space-y-6">
           <div>
@@ -175,6 +264,40 @@ export function SettingsTab() {
               value={systemPromptNarrative}
               onChange={(e) => setSystemPromptNarrative(e?.target?.value ?? '')}
               placeholder="Example: You are a legal writing assistant. Help me craft compelling narratives backed by evidence."
+            />
+          </div>
+
+          {/* Timeline Chat System Prompt */}
+          <div className="space-y-2">
+            <Label htmlFor="prompt-timeline" className="text-base font-medium">
+              Timeline Chat System Prompt
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              For the Timeline Assistant. Helps analyze chronology and suggest plot points.
+            </p>
+            <textarea
+              id="prompt-timeline"
+              className="w-full min-h-[120px] border border-border rounded-md p-3 text-sm font-mono bg-background text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              value={systemPromptTimeline}
+              onChange={(e) => setSystemPromptTimeline(e?.target?.value ?? '')}
+              placeholder="Leave empty to use default timeline assistant behavior."
+            />
+          </div>
+
+          {/* Global Rules */}
+          <div className="space-y-2">
+            <Label htmlFor="global-rules" className="text-base font-medium">
+              Global Rules
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              Rules prepended to ALL system prompts (main chat, narrative chat, and timeline chat).
+            </p>
+            <textarea
+              id="global-rules"
+              className="w-full min-h-[120px] border border-border rounded-md p-3 text-sm font-mono bg-background text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              value={globalRules}
+              onChange={(e) => setGlobalRules(e?.target?.value ?? '')}
+              placeholder="Example: Always cite sources. Be concise. Use formal legal language."
             />
           </div>
         </div>

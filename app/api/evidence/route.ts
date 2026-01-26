@@ -33,6 +33,17 @@ export async function POST(request: Request) {
     const file = formData.get('file') as File;
     const caseId = formData.get('caseId') as string;
     const memoryType = formData.get('memoryType') as string;
+    const extractedText = formData.get('extractedText') as string;
+    const metadataJson = formData.get('metadata') as string;
+
+    let metadata = null;
+    if (metadataJson) {
+      try {
+        metadata = JSON.parse(metadataJson);
+      } catch (e) {
+        console.error('Failed to parse metadata JSON:', e);
+      }
+    }
 
     if (!file || !caseId || !memoryType) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -101,9 +112,43 @@ export async function POST(request: Request) {
 
     // Save metadata + checksum
     const evidenceId = `evidence-${Date.now()}`;
-    db.prepare(
-      "INSERT INTO evidence (id, case_id, filename, filepath, memory_type, checksum) VALUES (?, ?, ?, ?, ?, ?)"
-    ).run(evidenceId, caseId, file.name, filepath, memoryType, checksum);
+
+    // Build INSERT statement with metadata if available
+    if (metadata) {
+      db.prepare(`
+        INSERT INTO evidence (
+          id, case_id, filename, filepath, memory_type, checksum,
+          extracted_text, document_type, actual_author, submitted_by_party,
+          key_dates, key_entities, key_claims, document_tone,
+          user_context_notes, defense_strategy, user_counter_narrative,
+          strategic_summary,
+          legal_areas, cause_of_action, relief_sought, legal_significance
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        evidenceId, caseId, file.name, filepath, memoryType, checksum,
+        extractedText || content,
+        metadata.document_type || null,
+        metadata.actual_author || null,
+        metadata.submitted_by_party || null,
+        metadata.key_dates ? JSON.stringify(metadata.key_dates) : null,
+        metadata.key_entities ? JSON.stringify(metadata.key_entities) : null,
+        metadata.key_claims ? JSON.stringify(metadata.key_claims) : null,
+        metadata.document_tone || null,
+        metadata.user_context_notes || null,
+        metadata.defense_strategy || null,
+        metadata.user_counter_narrative || null,
+        metadata.strategic_summary || null,
+        metadata.legal_areas ? JSON.stringify(metadata.legal_areas) : null,
+        metadata.cause_of_action || null,
+        metadata.relief_sought || null,
+        metadata.legal_significance || null
+      );
+    } else {
+      // No metadata - basic upload
+      db.prepare(
+        "INSERT INTO evidence (id, case_id, filename, filepath, memory_type, checksum, extracted_text) VALUES (?, ?, ?, ?, ?, ?, ?)"
+      ).run(evidenceId, caseId, file.name, filepath, memoryType, checksum, extractedText || content);
+    }
 
     return NextResponse.json({ id: evidenceId, filename: file.name });
   } catch (error) {

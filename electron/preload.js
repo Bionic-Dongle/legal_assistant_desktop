@@ -8,4 +8,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getSavedChats: () => ipcRenderer.invoke("get-saved-chats"),
   loadChat: (filename) => ipcRenderer.invoke("load-chat", filename),
   archiveChat: (filename) => ipcRenderer.invoke("archive-chat", filename),
+  openFile: (filepath) => ipcRenderer.invoke("open-file", filepath),
+});
+
+contextBridge.exposeInMainWorld("electron", {
+  openFile: (filepath) => ipcRenderer.invoke("open-file", filepath),
 });
