@@ -25,6 +25,7 @@ interface PlotPoint {
   narrative_id: string;
   thread_id: string | null;
   title: string;
+  description?: string | null;
   content: string;
   event_date: string | null;
   sort_order: number;

@@ -167,16 +167,16 @@ function TimelineDot({
     <div
       ref={setNodeRef}
       style={style}
-      className="relative flex-shrink-0"
+      className="relative flex-shrink-0 cursor-pointer"
       onMouseEnter={(e) => setTooltipPos({ x: e.clientX, y: e.clientY })}
       onMouseLeave={() => setTooltipPos(null)}
       onMouseMove={(e) => setTooltipPos({ x: e.clientX, y: e.clientY })}
+      onClick={() => { if (!isDragging) onClick(plotPoint); }}
     >
       <div
         {...attributes}
         {...listeners}
-        onClick={(e) => { e.stopPropagation(); if (!isDragging) onClick(plotPoint); }}
-        className="w-3 h-3 rounded-full cursor-pointer transition-transform hover:scale-[1.6] border-2 border-background shadow-sm"
+        className="w-3 h-3 rounded-full transition-transform hover:scale-[1.6] border-2 border-background shadow-sm"
         style={{ backgroundColor: threadColor }}
       />
 
@@ -184,9 +184,11 @@ function TimelineDot({
         <div
           style={{
             position: 'fixed',
-            left: tooltipPos.x + 14,
-            top: tooltipPos.y - 8,
-            transform: 'translateY(-100%)',
+            left: Math.min(tooltipPos.x + 14, window.innerWidth - 270),
+            top: tooltipPos.y > 200
+              ? tooltipPos.y - 8
+              : tooltipPos.y + 20,
+            transform: tooltipPos.y > 200 ? 'translateY(-100%)' : 'none',
             zIndex: 9999,
           }}
           className="w-64 bg-popover border border-border rounded-md shadow-xl p-3 pointer-events-none"
