@@ -133,6 +133,7 @@ export function NarrativeConstructionTab({ caseId }: { caseId: string }) {
 
   const handleSavePlotPoint = async (data: {
     title: string;
+    description: string;
     content: string;
     event_date: string;
     thread_id: string;

@@ -8,6 +8,7 @@ interface TimelineCardProps {
     id: string;
     narrative_id: string;
     title: string;
+    description?: string | null;
     content: string;
     thread_id: string | null;
     event_date: string | null;
@@ -99,7 +100,10 @@ export function TimelineCard({ plotPoint, threadColor, onClick, onDelete }: Time
           </div>
         )}
       </div>
-      {plotPoint.content && (
+      {plotPoint.description && (
+        <div className="text-xs text-foreground/80 mb-1 line-clamp-1">{plotPoint.description}</div>
+      )}
+      {!plotPoint.description && plotPoint.content && (
         <div className="text-xs text-muted-foreground line-clamp-2">
           {getTextPreview(plotPoint.content)}
         </div>

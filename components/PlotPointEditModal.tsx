@@ -27,6 +27,7 @@ interface PlotPointEditModalProps {
   onClose: () => void;
   onSave: (data: {
     title: string;
+    description: string;
     content: string;
     event_date: string;
     thread_id: string;
@@ -35,6 +36,7 @@ interface PlotPointEditModalProps {
   plotPoint: {
     id: string;
     title: string;
+    description?: string | null;
     content: string;
     event_date: string | null;
     thread_id: string | null;
@@ -57,6 +59,7 @@ export function PlotPointEditModal({
   caseId,
 }: PlotPointEditModalProps) {
   const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [eventDate, setEventDate] = useState('');
   const [threadId, setThreadId] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -88,6 +91,7 @@ export function PlotPointEditModal({
   useEffect(() => {
     if (plotPoint) {
       setTitle(plotPoint.title);
+      setDescription(plotPoint.description || '');
       setEventDate(plotPoint.event_date || '');
       setThreadId(plotPoint.thread_id || threads[0]?.id || '');
       editor?.commands.setContent(plotPoint.content || '');
@@ -105,6 +109,7 @@ export function PlotPointEditModal({
       }
     } else {
       setTitle('');
+      setDescription('');
       setEventDate('');
       setThreadId(threads[0]?.id || '');
       editor?.commands.setContent('');
@@ -194,6 +199,7 @@ export function PlotPointEditModal({
     try {
       await onSave({
         title: title.trim(),
+        description: description.trim(),
         content: editor?.getHTML() || '',
         event_date: eventDate,
         thread_id: threadId,
@@ -223,6 +229,17 @@ export function PlotPointEditModal({
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Enter plot point title..."
               required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="description">Description <span className="text-muted-foreground text-xs font-normal">(one line — shown in timeline tooltip)</span></Label>
+            <Input
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Brief summary of this event..."
+              maxLength={160}
             />
           </div>
 
