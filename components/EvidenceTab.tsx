@@ -184,8 +184,8 @@ export function EvidenceTab({ caseId }: { caseId: string }) {
         <div className="flex-1 px-6 pb-6 min-h-0">
           <div className="grid grid-cols-2 gap-6 h-full">
           {/* Plaintiff Evidence List */}
-          <div className="border border-border rounded-lg p-6 flex flex-col h-full">
-            <h3 className="text-lg font-semibold mb-4 flex-shrink-0">Plaintiff Evidence</h3>
+          <div className="border border-border rounded-lg p-4 flex flex-col h-full">
+            <h3 className="text-lg font-semibold mb-2 flex-shrink-0">Plaintiff Evidence</h3>
             <div className="space-y-2 overflow-y-auto flex-1 min-h-0">
               {evidence?.filter(e => e.memory_type === 'plaintiff')?.length === 0 ? (
                 <p className="text-muted-foreground text-sm">No plaintiff evidence uploaded yet</p>
@@ -195,7 +195,7 @@ export function EvidenceTab({ caseId }: { caseId: string }) {
                   ?.map?.((item) => (
                     <div
                       key={item?.id}
-                      className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                      className="flex items-center justify-between px-3 py-1.5 bg-muted rounded-md"
                     >
                       <div className="flex items-center gap-2 flex-1 min-w-0">
                         <FileText className="w-4 h-4 text-primary flex-shrink-0" />
@@ -233,8 +233,8 @@ export function EvidenceTab({ caseId }: { caseId: string }) {
           </div>
 
           {/* Opposition Evidence List */}
-          <div className="border border-border rounded-lg p-6 flex flex-col h-full">
-            <h3 className="text-lg font-semibold mb-4 flex-shrink-0">Opposition/Defense Evidence</h3>
+          <div className="border border-border rounded-lg p-4 flex flex-col h-full">
+            <h3 className="text-lg font-semibold mb-2 flex-shrink-0">Opposition/Defense Evidence</h3>
             <div className="space-y-2 overflow-y-auto flex-1 min-h-0">
               {evidence?.filter(e => e.memory_type === 'opposition')?.length === 0 ? (
                 <p className="text-muted-foreground text-sm">No opposition evidence uploaded yet</p>
@@ -244,7 +244,7 @@ export function EvidenceTab({ caseId }: { caseId: string }) {
                   ?.map?.((item) => (
                     <div
                       key={item?.id}
-                      className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                      className="flex items-center justify-between px-3 py-1.5 bg-muted rounded-md"
                     >
                       <div className="flex items-center gap-2 flex-1 min-w-0">
                         <FileText className="w-4 h-4 text-primary flex-shrink-0" />

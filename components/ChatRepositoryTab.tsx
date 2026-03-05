@@ -73,13 +73,6 @@ export function ChatRepositoryTab() {
             <div className="flex gap-2">
               <Button
                 size="sm"
-                variant="outline"
-                onClick={() => navigator.clipboard.writeText(JSON.stringify(chat.content, null, 2))}
-              >
-                Copy JSON
-              </Button>
-              <Button
-                size="sm"
                 variant="default"
                 onClick={async () => {
                   const result = await window.electronAPI.archiveChat(chat.name);
