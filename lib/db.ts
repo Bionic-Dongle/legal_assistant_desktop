@@ -121,6 +121,7 @@ export function initDatabase() {
       narrative_id TEXT NOT NULL,
       thread_id TEXT,
       title TEXT NOT NULL,
+      description TEXT,
       content TEXT NOT NULL,
       event_date TEXT,
       evidence_date TEXT,
@@ -309,6 +310,20 @@ export function initDatabase() {
       console.log('🔧 Migrating plot_points table: adding attachments column...');
       db.exec('ALTER TABLE plot_points ADD COLUMN attachments TEXT');
       console.log('✅ Migration complete: attachments column added');
+    }
+  } catch (error) {
+    console.error('⚠️ Migration warning:', error);
+  }
+
+  // Migration: Add description column to plot_points if it doesn't exist
+  try {
+    const plotPointsTableInfo = db.prepare('PRAGMA table_info(plot_points)').all() as Array<{ name: string }>;
+    const hasDescription = plotPointsTableInfo.some(col => col.name === 'description');
+
+    if (!hasDescription) {
+      console.log('🔧 Migrating plot_points table: adding description column...');
+      db.exec('ALTER TABLE plot_points ADD COLUMN description TEXT');
+      console.log('✅ Migration complete: description column added');
     }
   } catch (error) {
     console.error('⚠️ Migration warning:', error);

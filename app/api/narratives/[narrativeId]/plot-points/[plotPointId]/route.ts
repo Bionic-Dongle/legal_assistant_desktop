@@ -8,7 +8,7 @@ export async function PUT(
   try {
     const { plotPointId } = params;
     const body = await request.json();
-    const { title, content, thread_id, event_date, evidence_date, sort_order, attachments } = body;
+    const { title, description, content, thread_id, event_date, evidence_date, sort_order, attachments } = body;
 
     const updates: string[] = [];
     const values: any[] = [];
@@ -16,6 +16,11 @@ export async function PUT(
     if (title !== undefined) {
       updates.push('title = ?');
       values.push(title);
+    }
+
+    if (description !== undefined) {
+      updates.push('description = ?');
+      values.push(description);
     }
 
     if (content !== undefined) {

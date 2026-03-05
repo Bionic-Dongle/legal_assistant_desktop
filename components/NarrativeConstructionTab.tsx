@@ -25,6 +25,7 @@ interface PlotPoint {
   narrative_id: string;
   thread_id: string | null;
   title: string;
+  description?: string | null;
   content: string;
   event_date: string | null;
   sort_order: number;
@@ -133,6 +134,7 @@ export function NarrativeConstructionTab({ caseId }: { caseId: string }) {
 
   const handleSavePlotPoint = async (data: {
     title: string;
+    description: string;
     content: string;
     event_date: string;
     thread_id: string;

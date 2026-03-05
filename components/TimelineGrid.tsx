@@ -1,18 +1,20 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { DndContext, DragOverlay, closestCenter, closestCorners, PointerSensor, useSensor, useSensors, DragOverEvent } from '@dnd-kit/core';
-import { useDroppable } from '@dnd-kit/core';
+import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, addWeeks, addMonths, addQuarters, addYears } from 'date-fns';
 import { TimelineCard } from './TimelineCard';
-import { GripVertical, ChevronRight, ChevronDown, Eye, EyeOff } from 'lucide-react';
+import { GripVertical, ChevronRight, ChevronDown, Eye, EyeOff, Paperclip } from 'lucide-react';
 
 interface PlotPoint {
   id: string;
   narrative_id: string;
   title: string;
+  description?: string | null;
   content: string;
   thread_id: string | null;
   event_date: string | null;
@@ -125,6 +127,100 @@ function SortableThreadRow({
   );
 }
 
+function TimelineDot({
+  plotPoint,
+  threadColor,
+  onClick,
+}: {
+  plotPoint: PlotPoint;
+  threadColor: string;
+  onClick: (pp: PlotPoint) => void;
+}) {
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: plotPoint.id,
+    data: { plotPoint },
+  });
+
+  const style = transform
+    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, opacity: isDragging ? 0.3 : 1 }
+    : undefined;
+
+  const getTextPreview = (html: string) => {
+    if (typeof document === 'undefined') return '';
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    const text = div.textContent || div.innerText || '';
+    return text.length > 120 ? text.substring(0, 120) + '...' : text;
+  };
+
+  const attachmentCount = (() => {
+    if (!plotPoint.attachments) return 0;
+    try {
+      const parsed = JSON.parse(plotPoint.attachments);
+      return Array.isArray(parsed) ? parsed.length : 0;
+    } catch { return 0; }
+  })();
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="relative flex-shrink-0 cursor-pointer"
+      onMouseEnter={(e) => setTooltipPos({ x: e.clientX, y: e.clientY })}
+      onMouseLeave={() => setTooltipPos(null)}
+      onMouseMove={(e) => setTooltipPos({ x: e.clientX, y: e.clientY })}
+      onClick={() => { if (!isDragging) onClick(plotPoint); }}
+    >
+      <div
+        {...attributes}
+        {...listeners}
+        className="w-3 h-3 rounded-full transition-transform hover:scale-[1.6] border-2 border-background shadow-sm"
+        style={{ backgroundColor: threadColor }}
+      />
+
+      {tooltipPos && !isDragging && typeof document !== 'undefined' && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            left: Math.min(tooltipPos.x + 14, window.innerWidth - 270),
+            top: tooltipPos.y > 200
+              ? tooltipPos.y - 8
+              : tooltipPos.y + 20,
+            transform: tooltipPos.y > 200 ? 'translateY(-100%)' : 'none',
+            zIndex: 9999,
+          }}
+          className="w-64 bg-popover border border-border rounded-md shadow-xl p-3 pointer-events-none"
+        >
+          <div className="font-semibold text-sm text-foreground">{plotPoint.title}</div>
+          {plotPoint.description && (
+            <div className="text-xs text-foreground/80 mt-0.5">{plotPoint.description}</div>
+          )}
+          {plotPoint.event_date && (
+            <div className="text-xs text-muted-foreground mt-1.5">
+              {format(parseISO(plotPoint.event_date), 'MMMM d, yyyy')}
+            </div>
+          )}
+          {!plotPoint.description && plotPoint.content && (
+            <div className="text-xs text-muted-foreground mt-1 leading-relaxed">
+              {getTextPreview(plotPoint.content)}
+            </div>
+          )}
+          {attachmentCount > 0 && (
+            <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+              <Paperclip className="w-3 h-3" />
+              <span>{attachmentCount} attachment{attachmentCount !== 1 ? 's' : ''}</span>
+            </div>
+          )}
+          <div className="text-xs text-primary/70 mt-2 font-medium">Click to open ↗</div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+
 function GridCell({
   threadId,
   period,
@@ -152,19 +248,28 @@ function GridCell({
   return (
     <div
       ref={setNodeRef}
-      className={`min-h-[100px] border-b border-r border-border p-2 space-y-2 transition-colors ${
-        isOver ? 'bg-accent' : 'bg-background'
+      className={`min-h-[48px] border-b border-r border-border relative flex items-center justify-center transition-colors ${
+        isOver ? 'bg-accent/20' : ''
       }`}
     >
-      {plotPoints.map((pp) => (
-        <TimelineCard
-          key={pp.id}
-          plotPoint={pp}
-          threadColor={threadColor}
-          onClick={() => onPlotPointClick(pp)}
-          onDelete={onPlotPointDelete}
-        />
-      ))}
+      {/* Thread colour line */}
+      <div
+        className="absolute left-0 right-0 pointer-events-none"
+        style={{ height: '2px', backgroundColor: threadColor, opacity: 0.4 }}
+      />
+      {/* Dots */}
+      {plotPoints.length > 0 && (
+        <div className="relative z-10 flex items-center gap-1.5 flex-wrap justify-center px-2 py-1">
+          {plotPoints.map((pp) => (
+            <TimelineDot
+              key={pp.id}
+              plotPoint={pp}
+              threadColor={threadColor}
+              onClick={onPlotPointClick}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

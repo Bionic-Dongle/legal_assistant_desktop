@@ -33,8 +33,8 @@ export async function POST(request: Request) {
     const id = `thread-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 
     db.prepare(
-      `INSERT INTO narrative_threads (id, case_id, title, description, color, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO narrative_threads (id, case_id, title, description, color, sort_order, is_visible)
+       VALUES (?, ?, ?, ?, ?, ?, 1)`
     ).run(
       id,
       case_id,
