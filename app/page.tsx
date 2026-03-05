@@ -153,7 +153,7 @@ export default function Home() {
           </TabsContent>
 
           <TabsContent value="repository" className="h-full m-0 overflow-y-auto">
-            <ChatRepositoryTab />
+            <ChatRepositoryTab onOpenChat={() => setActiveTab('chat')} />
           </TabsContent>
 
           <TabsContent value="narrative" className="h-full m-0">
