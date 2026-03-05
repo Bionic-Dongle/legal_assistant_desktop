@@ -42,7 +42,7 @@ export function ChatRepositoryTab() {
     c.name.toLowerCase().includes(search.toLowerCase())
   );
   return (
-    <div className="p-6 h-full overflow-y-auto space-y-6">
+    <div className="p-4 h-full overflow-y-auto space-y-4">
       <div className="flex items-center gap-3">
         <Input
           placeholder="Search chats..."
@@ -61,19 +61,20 @@ export function ChatRepositoryTab() {
         </Button>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-1.5">
         {filtered.length === 0 && <p>No saved chats found.</p>}
         {filtered.map((chat) => (
           <div
             key={chat.name}
-            className="flex items-center justify-between p-3 rounded-lg border bg-muted/30 hover:bg-muted/60 transition"
+            className="flex items-center justify-between px-3 py-1.5 rounded-md border bg-muted/30 hover:bg-muted/60 transition"
             title={chat.content?.description || 'No description available'}
           >
-            <span>{chat.name}</span>
-            <div className="flex gap-2">
+            <span className="text-sm truncate flex-1 min-w-0 mr-3">{chat.name}</span>
+            <div className="flex gap-1.5 flex-shrink-0">
               <Button
                 size="sm"
                 variant="default"
+                className="h-7 text-xs px-2"
                 onClick={async () => {
                   const result = await window.electronAPI.archiveChat(chat.name);
                   if (result?.success) {
@@ -89,6 +90,7 @@ export function ChatRepositoryTab() {
               <Button
                 size="sm"
                 variant="outline"
+                className="h-7 text-xs px-2"
                 onClick={async () => {
                   const loaded = await window.electronAPI.loadChat(chat.name);
                   if (loaded?.messages) {
