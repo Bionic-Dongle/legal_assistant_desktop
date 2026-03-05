@@ -58,11 +58,11 @@
     "package": "next build && electron-builder build --win --x64"
   },
   "build": {
-    "appId": "com.legalassistant.app",
-    "productName": "Legal Assistant",
+    "appId": "com.legalmind.app",
+    "productName": "LegalMind",
     "win": {
       "target": "nsis",
-      "icon": "public/icon.png"
+      "icon": "public/icon.ico"
     },
     "files": [
       ".next/**/*",
