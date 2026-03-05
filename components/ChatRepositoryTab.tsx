@@ -11,7 +11,7 @@ interface SavedChatFile {
   content: any;
 }
 
-export function ChatRepositoryTab() {
+export function ChatRepositoryTab({ onOpenChat }: { onOpenChat?: () => void }) {
   const [chats, setChats] = useState<SavedChatFile[]>([]);
   const [search, setSearch] = useState('');
   const [selectedChat, setSelectedChat] = useState<SavedChatFile | null>(null);
@@ -96,8 +96,9 @@ export function ChatRepositoryTab() {
                   if (loaded?.messages) {
                     localStorage.removeItem('activeChat');
                     localStorage.removeItem('activeSessionId');
-                    toast.success(`Opened ${chat.name}`);
                     window.dispatchEvent(new CustomEvent('chat-loaded', { detail: loaded.messages }));
+                    onOpenChat?.();
+                    toast.success(`Opened: ${chat.name}`);
                   } else {
                     toast.error('Failed to open chat');
                   }
