@@ -14,12 +14,18 @@ interface DocumentViewerModalProps {
   onClose: () => void;
 }
 
-// Create a single instance of diff-match-patch
-const dmp = new DiffMatchPatch();
-// Configure for fuzzy matching - higher threshold = more fuzzy (0.0 = exact, 1.0 = very fuzzy)
-dmp.Match_Threshold = 0.4;
-// How far to search for a match (1000 = search within 1000 chars of expected location)
-dmp.Match_Distance = 10000;
+// Lazy singleton - avoids module-level instantiation which can fail during SSR
+// and silently make this module's exports undefined
+let _dmp: any = null;
+function getDmp() {
+  if (!_dmp) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    _dmp = new (DiffMatchPatch as any)();
+    _dmp.Match_Threshold = 0.4;   // higher = more fuzzy (0.0 exact, 1.0 very fuzzy)
+    _dmp.Match_Distance = 10000;  // search within 10000 chars of expected location
+  }
+  return _dmp;
+}
 
 export function DocumentViewerModal({
   filename,
@@ -123,7 +129,7 @@ export function DocumentViewerModal({
     const searchPattern = normalizedQuote.substring(0, 30);
 
     try {
-      index = dmp.match_main(normalizedText, searchPattern, 0);
+      index = getDmp().match_main(normalizedText, searchPattern, 0);
       if (index !== -1) {
         // Map back to original text position
         let origIndex = 0;
