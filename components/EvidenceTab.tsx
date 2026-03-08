@@ -5,6 +5,7 @@ import { Button } from './ui/button';
 import { Upload, FileText, Trash2, Eye, Bot } from 'lucide-react';
 import { toast } from 'sonner';
 import { EvidenceUploadBotPanel } from './EvidenceUploadBotPanel';
+import { ImportQueuePanel } from './ImportQueuePanel';
 
 interface Evidence {
   id: string;
@@ -41,12 +42,18 @@ export function EvidenceTab({ caseId }: { caseId: string }) {
   };
 
   const extractTextFromFile = async (file: File): Promise<string> => {
-    // Simple text extraction for now - can be enhanced with pdf-parse, mammoth, etc.
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    // PDF and Word docs are binary — browser can't read them as text.
+    // Return empty string; the server handles proper extraction via lib/extract.ts
+    if (ext === 'pdf' || ext === 'doc' || ext === 'docx') {
+      return '';
+    }
+    // Plain text files (.txt, .eml, .md, .csv) can be read directly in the browser
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const text = e.target?.result as string;
-        resolve(text.substring(0, 10000)); // First 10k chars
+        resolve(text.substring(0, 10000));
       };
       reader.readAsText(file);
     });
@@ -133,7 +140,10 @@ export function EvidenceTab({ caseId }: { caseId: string }) {
     <div className="flex h-full">
       {/* Left side - Evidence Lists */}
       <div className={`${showBotPanel ? 'w-2/3' : 'w-full'} flex flex-col transition-all`}>
-        {/* Upload Areas - Fixed at top */}
+        {/* Cowork import queue banner — only visible when emails are waiting */}
+      <ImportQueuePanel caseId={caseId} onImportComplete={loadEvidence} />
+
+      {/* Upload Areas - Fixed at top */}
         <div className="p-6 pb-3 flex-shrink-0">
           <div className="grid grid-cols-2 gap-6">
           <div

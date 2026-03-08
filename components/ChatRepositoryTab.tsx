@@ -70,6 +70,9 @@ export function ChatRepositoryTab({ onOpenChat }: { onOpenChat?: () => void }) {
             title={chat.content?.description || 'No description available'}
           >
             <span className="text-sm truncate flex-1 min-w-0 mr-3">{chat.name}</span>
+            <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded flex-shrink-0 mr-2 whitespace-nowrap">
+              {chat.content?.messages?.length ?? 0} msgs
+            </span>
             <div className="flex gap-1.5 flex-shrink-0">
               <Button
                 size="sm"

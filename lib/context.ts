@@ -56,26 +56,31 @@ export async function buildCaseContext(
     }
   }
 
-  // Insights & Arguments context
+  // Insights & Arguments context — retrieved by relevance to current query, not by recency.
+  // Each category lives in its own vector collection, partitioned from evidence,
+  // and labelled distinctly so the AI knows the confidence level of each source.
   if (includeInsights || includeArguments) {
-    const catList: { label: string; category: string }[] = [];
-    if (includeInsights) catList.push({ label: "Key Insights", category: "insight" });
-    if (includeArguments) catList.push({ label: "Arguments", category: "argument" });
+    const catList: { label: string; collection: string }[] = [];
+    if (includeInsights) catList.push({
+      label: "Working Insights *(analytical leads — treat as hypotheses, not established facts)*",
+      collection: `insights_${caseId}`,
+    });
+    if (includeArguments) catList.push({
+      label: "Legal Arguments *(positions under development)*",
+      collection: `arguments_${caseId}`,
+    });
 
-    for (const { label, category } of catList) {
+    for (const { label, collection } of catList) {
       try {
-        const rows = db
-          .prepare("SELECT content, created_at FROM saved_insights WHERE case_id = ? AND category = ? ORDER BY created_at DESC")
-          .all(caseId, category) as any[];
-
-        if (rows.length > 0) {
-          const formatted = rows
-            .map((r) => `• (${r.created_at}) ${r.content}`)
-            .join("\n");
+        const results = await queryDocuments(collection, query, maxResults);
+        if (results?.documents?.[0]?.length) {
+          const formatted = results.documents[0]
+            .map((doc, i) => `(${i + 1}) ${doc}`)
+            .join("\n\n");
           contextSections.push(`### ${label}\n${formatted}`);
         }
       } catch (err) {
-        console.warn(`⚠️ Failed to fetch ${label}:`, err);
+        console.warn(`⚠️ Failed to retrieve from vector store for ${label}:`, err);
       }
     }
   }

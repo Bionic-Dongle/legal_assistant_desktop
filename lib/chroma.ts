@@ -126,6 +126,16 @@ export async function queryDocuments(
   };
 }
 
+export async function removeDocuments(
+  collectionName: string,
+  ids: string[]
+) {
+  const collection = loadCollection(collectionName);
+  const filtered = collection.filter((doc) => !ids.includes(doc.id));
+  saveCollection(collectionName, filtered);
+  return { removed: collection.length - filtered.length };
+}
+
 export async function getOrCreateCollection(name: string) {
   // Stub for compatibility
   return { name };

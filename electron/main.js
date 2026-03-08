@@ -1,6 +1,7 @@
 require("dotenv").config();
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
+const fs = require("fs");
 
 let store;
 let mainWindow;
@@ -41,6 +42,27 @@ async function createWindow() {
   store = new ElectronStore.default();
 
   if (!isDev) {
+    // In production, point the working directory at the user's personal data folder
+    // so that all API routes find their data/ directory correctly.
+    // This is the stable Windows location: C:\Users\{name}\AppData\Roaming\Legal Assistant\
+    // It is never overwritten when the app is updated or re-extracted.
+    const userDataPath = app.getPath("userData");
+
+    // Pre-create all directories the app expects to find
+    const dataDirs = [
+      path.join(userDataPath, "data"),
+      path.join(userDataPath, "data", "evidence"),
+      path.join(userDataPath, "data", "vectors"),
+      path.join(userDataPath, "data", "import-queue"),
+      path.join(userDataPath, "data", "gdrive-import"),
+      path.join(userDataPath, "data", "gdrive-import", "plaintiff"),
+      path.join(userDataPath, "data", "gdrive-import", "opposition"),
+    ];
+    for (const dir of dataDirs) {
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    }
+
+    process.chdir(userDataPath);
     await startNextServer();
   }
 
@@ -148,7 +170,6 @@ ipcMain.handle("get-app-path", async () => {
 });
 
 // Chat save/load handlers
-const fs = require("fs");
 const chatsDir = path.join(app.getPath("userData"), "chats");
 
 if (!fs.existsSync(chatsDir)) {
