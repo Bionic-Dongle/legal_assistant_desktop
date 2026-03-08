@@ -1,5 +1,5 @@
 # LegalMind — Current State
-_Last updated: 2026-03-07 (session 2)_
+_Last updated: 2026-03-08 (session 4)_
 
 ---
 
@@ -93,6 +93,42 @@ These are not code changes — they're how we work together going forward:
 4. **Global permissions fixed** — `C:\Users\chipp\.claude\settings.json` now has the full allow list so approval dialogs for file operations don't appear in any project, any session
 5. **Time estimates** — quoted in "minutes of Claude work" not "hours of human developer work"
 6. **Playwright regression testing** — added to long-term roadmap. Not next sprint but worth building toward: automated cumulative testing with rollback on regression
+
+---
+
+## What Was Fixed/Built This Session (2026-03-08, sessions 3–4)
+
+9. **OpenRouter support** — Settings now supports OpenRouter as a third AI provider.
+   Live model list fetched from OpenRouter API on load (no hardcoded list).
+   Custom scrollable Select component handles the long model list cleanly.
+
+10. **Settings rewrite** — Collapsible sections, better ordering: API config first,
+    then model selectors, then system prompts, then utilities. All sections start
+    collapsed. The "Main Chat Provider" section was incorrectly defaulting to open —
+    fixed (`provider: false` in initial state).
+
+11. **System prompt overlay fixed (main chat + timeline)** — If a user-defined system
+    prompt was set in Settings, it was replacing the entire base prompt instead of
+    layering on top. Fixed in both `app/api/chat/route.ts` and
+    `app/api/timeline-chat/route.ts`. User's text now appends under a clearly labelled
+    section heading.
+
+12. **AI hallucination fix** — The AI was inventing fake chat history to explain why
+    it knew the user's configured name ("you mentioned earlier that I should call you
+    chippo"). Root cause: the overlay section was labelled `### User Instructions`,
+    making the AI think it came from the conversation. Fixed by changing the label to
+    `### Configured Preferences (set by the user in Settings — NOT said in this
+    conversation)` in both chat routes.
+
+13. **Auto-Plot Evidence feature** — New ⚡ button in the Narrative Construction toolbar
+    opens a review modal that suggests plot points for every piece of imported evidence
+    that hasn't been plotted yet.
+    - Dated items are pre-selected; undated items are unchecked and ask for a date
+    - Each row has editable title, date picker, thread selector, memory_type badge
+    - On confirm: creates the plot points then marks evidence as `auto_plotted = 1`
+      so they don't show again
+    - New files: `app/api/evidence/auto-plot/route.ts`, `components/AutoPlotModal.tsx`
+    - `lib/db.ts`: additive migration adds `auto_plotted` column to evidence table
 
 ---
 
