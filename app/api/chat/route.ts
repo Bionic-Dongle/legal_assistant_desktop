@@ -95,11 +95,7 @@ export async function POST(request: Request) {
         return '';
       })();
 
-      let baseSystemPrompt: string;
-      if (userPrompt) {
-        baseSystemPrompt = userPrompt;
-      } else {
-        baseSystemPrompt = `You are LegalMind — a local, privacy‑first legal reasoning environment.
+      const legalMindBase = `You are LegalMind — a local, privacy‑first legal reasoning environment.
 Maintain two cognitive modes:
 • **Analytical Mode** — precise, logical reasoning grounded in evidence and law.
 • **Conversational Mode** — flexible, contextually aware, adapting tone to human dialogue history.
@@ -145,6 +141,13 @@ EXAMPLES:
 ✅ RIGHT: Each quote gets its own citation with the correct source document
 
 When user asks "What do they accuse me of?" - carefully read the evidence context, identify the correct source document for each accusation, and cite each one separately with exact quotes.`;
+
+      // Custom prompt from Settings overlays ON TOP of the base — doesn't replace it
+      let baseSystemPrompt: string;
+      if (userPrompt) {
+        baseSystemPrompt = `${legalMindBase}\n\n### Configured Preferences (set by the user in Settings — NOT said in this conversation)\n${userPrompt}`;
+      } else {
+        baseSystemPrompt = legalMindBase;
       }
 
       // --- Multi‑repository context assembly ---
@@ -192,7 +195,11 @@ When user asks "What do they accuse me of?" - carefully read the evidence contex
         : "No evidence uploaded yet.";
 
       // --- Assemble final system prompt ---
-      const systemPrompt = `🚨🚨🚨 CRITICAL CITATION RULES - ZERO TOLERANCE 🚨🚨🚨
+      const providerLabel = provider === 'openrouter' ? 'OpenRouter' : 'OpenAI';
+      const systemPrompt = `You are running on: ${selectedModel} (via ${providerLabel})
+If the user asks what model you are, what AI you are, or who made you — answer accurately using the above.
+
+🚨🚨🚨 CRITICAL CITATION RULES - ZERO TOLERANCE 🚨🚨🚨
 
 **RULE: COPY-PASTE ONLY - NO PARAPHRASING**
 When the user asks "what does X say about Y?", you MUST:

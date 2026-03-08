@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
-import { Plus, ListPlus } from 'lucide-react';
+import { Plus, ListPlus, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { InputModal } from './InputModal';
 import { TimelineGrid } from './TimelineGrid';
 import { TimelineToolbar } from './TimelineToolbar';
 import { PlotPointEditModal } from './PlotPointEditModal';
 import { TimelineChatPanel } from './TimelineChatPanel';
+import { AutoPlotModal } from './AutoPlotModal';
 
 interface Thread {
   id: string;
@@ -39,6 +40,7 @@ export function NarrativeConstructionTab({ caseId }: { caseId: string }) {
   const [selectedPlotPoint, setSelectedPlotPoint] = useState<PlotPoint | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [showThreadModal, setShowThreadModal] = useState(false);
+  const [showAutoPlot, setShowAutoPlot] = useState(false);
 
   // Timeline controls
   const [zoomLevel, setZoomLevel] = useState<'year' | 'quarter' | 'month' | 'week'>('month');
@@ -268,6 +270,15 @@ export function NarrativeConstructionTab({ caseId }: { caseId: string }) {
           <Plus className="w-4 h-4 mr-1" />
           New Plot Point
         </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setShowAutoPlot(true)}
+          title="Generate plot points from imported evidence"
+        >
+          <Zap className="w-4 h-4 mr-1 text-amber-500" />
+          Auto-Plot Evidence
+        </Button>
 
         {/* Zoom Controls */}
         {threads.length > 0 && (
@@ -354,6 +365,19 @@ export function NarrativeConstructionTab({ caseId }: { caseId: string }) {
           narrativeId={mainNarrativeId}
           plotPoints={plotPoints}
           threads={threads}
+          onRefreshTimeline={loadPlotPoints}
+        />
+      )}
+
+      {/* Auto-Plot Modal */}
+      {mainNarrativeId && (
+        <AutoPlotModal
+          isOpen={showAutoPlot}
+          onClose={() => setShowAutoPlot(false)}
+          caseId={caseId}
+          narrativeId={mainNarrativeId}
+          threads={threads}
+          currentPlotPointCount={plotPoints.length}
           onRefreshTimeline={loadPlotPoints}
         />
       )}

@@ -38,7 +38,7 @@ export function SettingsTab() {
   const [fetchingModels, setFetchingModels] = useState(false);
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    provider: true,
+    provider: false,
     openai: false,
     openrouter: false,
     claude: false,
@@ -437,8 +437,8 @@ export function SettingsTab() {
             sectionKey="prompts"
             title="System Prompts"
             summary={
-              [systemPromptMain, systemPromptNarrative, systemPromptTimeline, globalRules].filter(Boolean).length > 0
-                ? `${[systemPromptMain, systemPromptNarrative, systemPromptTimeline, globalRules].filter(Boolean).length} prompt(s) configured`
+              [systemPromptMain, systemPromptTimeline, globalRules].filter(Boolean).length > 0
+                ? `${[systemPromptMain, systemPromptTimeline, globalRules].filter(Boolean).length} prompt(s) configured`
                 : 'None set — using defaults'
             }
           />
@@ -455,23 +455,12 @@ export function SettingsTab() {
                   className="w-full min-h-[100px] border border-border rounded-md p-3 text-sm font-mono bg-background text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                   value={systemPromptMain}
                   onChange={(e) => setSystemPromptMain(e?.target?.value ?? '')}
-                  placeholder="e.g. You are my strategic legal advisor. Focus on risk analysis."
+                  placeholder="Extra instructions layered on top of the default behaviour. e.g. Call me Fred. Focus on risk analysis."
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="prompt-narrative" className="font-medium">Narrative Chat</Label>
-                <textarea
-                  id="prompt-narrative"
-                  className="w-full min-h-[100px] border border-border rounded-md p-3 text-sm font-mono bg-background text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-                  value={systemPromptNarrative}
-                  onChange={(e) => setSystemPromptNarrative(e?.target?.value ?? '')}
-                  placeholder="e.g. Help me craft compelling narratives backed by evidence."
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="prompt-timeline" className="font-medium">Timeline Chat</Label>
+                <Label htmlFor="prompt-timeline" className="font-medium">Timeline Assistant</Label>
                 <textarea
                   id="prompt-timeline"
                   className="w-full min-h-[100px] border border-border rounded-md p-3 text-sm font-mono bg-background text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"

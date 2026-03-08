@@ -143,8 +143,8 @@ export async function POST(request: Request) {
 
     const contextString = contextParts.join('\n');
 
-    // Build system prompt
-    const baseSystemPrompt = timeline_system_prompt || `You are a timeline construction assistant for legal case analysis.
+    // Build system prompt — user instructions layer ON TOP of the base, never replace it
+    const timelineBase = `You are a timeline construction assistant for legal case analysis.
 
 🚨 CRITICAL CITATION PROTOCOL:
 When referencing evidence or making factual claims, you MUST:
@@ -202,6 +202,10 @@ CONSTRAINTS:
 - You can ONLY suggest additions
 - You CANNOT delete or modify directly
 - All suggestions require user confirmation`;
+
+    const baseSystemPrompt = timeline_system_prompt
+      ? `${timelineBase}\n\n### Configured Preferences (set by the user in Settings — NOT said in this conversation)\n${timeline_system_prompt}`
+      : timelineBase;
 
     const fullSystemPrompt = global_rules
       ? `${global_rules}\n\n${baseSystemPrompt}\n\n🚨 REMINDER: When quoting from evidence, you MUST use the citation format: [📄 filename] "exact quote"\nThis is NON-NEGOTIABLE. Every quote from evidence MUST be cited with the [📄 filename] format.`

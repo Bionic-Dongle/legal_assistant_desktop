@@ -321,6 +321,20 @@ export function initDatabase() {
     console.error('⚠️ Migration warning:', error);
   }
 
+  // Migration: Add auto_plotted column to evidence if it doesn't exist
+  try {
+    const evidenceAutoPlotInfo = db.prepare('PRAGMA table_info(evidence)').all() as Array<{ name: string }>;
+    const hasAutoPlotted = evidenceAutoPlotInfo.some(col => col.name === 'auto_plotted');
+
+    if (!hasAutoPlotted) {
+      console.log('🔧 Migrating evidence table: adding auto_plotted column...');
+      db.exec('ALTER TABLE evidence ADD COLUMN auto_plotted INTEGER DEFAULT 0');
+      console.log('✅ Migration complete: auto_plotted column added');
+    }
+  } catch (error) {
+    console.error('⚠️ Migration warning:', error);
+  }
+
   // Seed default analysis prompts if none exist
   const promptCount = db.prepare('SELECT COUNT(*) as count FROM prompt_templates').get() as { count: number };
   if (promptCount.count === 0) {
