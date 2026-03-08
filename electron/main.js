@@ -1,7 +1,12 @@
-require("dotenv").config();
-const { app, BrowserWindow, ipcMain } = require("electron");
+const os = require("os");
 const path = require("path");
 const fs = require("fs");
+
+// Always load .env from AppData — same location dev and production use
+const appDataEnvPath = path.join(os.homedir(), "AppData", "Roaming", "LegalMind", ".env");
+require("dotenv").config({ path: appDataEnvPath });
+
+const { app, BrowserWindow, ipcMain } = require("electron");
 
 let store;
 let mainWindow;
@@ -41,28 +46,23 @@ async function createWindow() {
   const ElectronStore = await import("electron-store");
   store = new ElectronStore.default();
 
+  // Pre-create all data directories in AppData on every launch (dev and production)
+  const appDataBase = path.join(os.homedir(), "AppData", "Roaming", "LegalMind");
+  const dataDirs = [
+    path.join(appDataBase, "data"),
+    path.join(appDataBase, "data", "evidence"),
+    path.join(appDataBase, "data", "vectors"),
+    path.join(appDataBase, "data", "import-queue"),
+    path.join(appDataBase, "data", "gdrive-import"),
+    path.join(appDataBase, "data", "gdrive-import", "plaintiff"),
+    path.join(appDataBase, "data", "gdrive-import", "opposition"),
+    path.join(appDataBase, "data", "timeline-documents"),
+  ];
+  for (const dir of dataDirs) {
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  }
+
   if (!isDev) {
-    // In production, point the working directory at the user's personal data folder
-    // so that all API routes find their data/ directory correctly.
-    // This is the stable Windows location: C:\Users\{name}\AppData\Roaming\Legal Assistant\
-    // It is never overwritten when the app is updated or re-extracted.
-    const userDataPath = app.getPath("userData");
-
-    // Pre-create all directories the app expects to find
-    const dataDirs = [
-      path.join(userDataPath, "data"),
-      path.join(userDataPath, "data", "evidence"),
-      path.join(userDataPath, "data", "vectors"),
-      path.join(userDataPath, "data", "import-queue"),
-      path.join(userDataPath, "data", "gdrive-import"),
-      path.join(userDataPath, "data", "gdrive-import", "plaintiff"),
-      path.join(userDataPath, "data", "gdrive-import", "opposition"),
-    ];
-    for (const dir of dataDirs) {
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    }
-
-    process.chdir(userDataPath);
     await startNextServer();
   }
 

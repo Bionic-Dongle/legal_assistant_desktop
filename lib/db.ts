@@ -1,17 +1,9 @@
 
 import Database from 'better-sqlite3';
 import path from 'path';
-import fs from 'fs';
+import { getDataDir } from '@/lib/paths';
 
-const DB_DIR = process.env.NODE_ENV === 'production' 
-  ? path.join(process.cwd(), 'data')
-  : path.join(process.cwd(), 'data');
-
-if (!fs.existsSync(DB_DIR)) {
-  fs.mkdirSync(DB_DIR, { recursive: true });
-}
-
-const DB_PATH = path.join(DB_DIR, 'legal_assistant.db');
+const DB_PATH = path.join(getDataDir(), 'legal_assistant.db');
 
 export const db = new Database(DB_PATH);
 

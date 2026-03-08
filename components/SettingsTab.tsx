@@ -2,15 +2,26 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Switch } from './ui/switch';
+import { Select } from './ui/select';
 import { toast } from 'sonner';
+
+interface ModelOption {
+  value: string;
+  label: string;
+  group?: string;
+}
 
 export function SettingsTab() {
   const [openaiKey, setOpenaiKey] = useState('');
   const [openaiModel, setOpenaiModel] = useState('gpt-4o-mini');
+  const [mainChatProvider, setMainChatProvider] = useState('openai');
+  const [openrouterKey, setOpenrouterKey] = useState('');
+  const [openrouterModel, setOpenrouterModel] = useState('anthropic/claude-3.7-sonnet');
   const [baserowEnabled, setBaserowEnabled] = useState(false);
   const [baserowUrl, setBaserowUrl] = useState('http://localhost:8000');
   const [baserowToken, setBaserowToken] = useState('');
@@ -19,11 +30,31 @@ export function SettingsTab() {
   const [systemPromptTimeline, setSystemPromptTimeline] = useState('');
   const [globalRules, setGlobalRules] = useState('');
   const [anthropicKey, setAnthropicKey] = useState('');
-  const [claudeModel, setClaudeModel] = useState('claude-3-5-sonnet-20241022');
+  const [claudeModel, setClaudeModel] = useState('claude-3-7-sonnet-20250219');
   const [timelineApiPreference, setTimelineApiPreference] = useState('openai');
+
+  const [openrouterModels, setOpenrouterModels] = useState<ModelOption[]>([]);
+  const [openaiModels, setOpenaiModels] = useState<ModelOption[]>([]);
+  const [fetchingModels, setFetchingModels] = useState(false);
+
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    provider: true,
+    openai: false,
+    openrouter: false,
+    claude: false,
+    timeline: false,
+    prompts: false,
+    baserow: false,
+    storage: false,
+  });
+
+  const toggleSection = (key: string) => {
+    setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   useEffect(() => {
     loadSettings();
+    fetchModels();
   }, []);
 
   const loadSettings = async () => {
@@ -32,6 +63,9 @@ export function SettingsTab() {
       const data = await res.json();
       setOpenaiKey(data?.openai_key ?? '');
       setOpenaiModel(data?.openai_model ?? 'gpt-4o-mini');
+      setMainChatProvider(data?.main_chat_provider ?? 'openai');
+      setOpenrouterKey(data?.openrouter_key ?? '');
+      setOpenrouterModel(data?.openrouter_model ?? 'anthropic/claude-3.7-sonnet');
       setBaserowEnabled(data?.baserow_enabled === 'true');
       setBaserowUrl(data?.baserow_url ?? 'http://localhost:8000');
       setBaserowToken(data?.baserow_token ?? '');
@@ -40,12 +74,67 @@ export function SettingsTab() {
       setSystemPromptTimeline(data?.system_prompt_timeline ?? '');
       setGlobalRules(data?.global_rules ?? '');
       setAnthropicKey(data?.anthropic_api_key ?? '');
-      setClaudeModel(data?.claude_model ?? 'claude-3-5-sonnet-20241022');
+      setClaudeModel(data?.claude_model ?? 'claude-3-7-sonnet-20250219');
       setTimelineApiPreference(data?.timeline_api_preference ?? 'openai');
     } catch (error) {
       console.error('Failed to load settings:', error);
     }
   };
+
+  const fetchModels = async () => {
+    setFetchingModels(true);
+    try {
+      const [orRes, oaiRes] = await Promise.allSettled([
+        fetch('/api/models/openrouter'),
+        fetch('/api/models/openai'),
+      ]);
+
+      if (orRes.status === 'fulfilled' && orRes.value.ok) {
+        const orData = await orRes.value.json();
+        const providerNames: Record<string, string> = {
+          anthropic: 'Anthropic Claude',
+          openai: 'OpenAI',
+          google: 'Google',
+          'meta-llama': 'Meta Llama',
+          deepseek: 'DeepSeek',
+          mistralai: 'Mistral',
+          qwen: 'Qwen / Alibaba',
+          microsoft: 'Microsoft',
+          cohere: 'Cohere',
+          perplexity: 'Perplexity',
+          'x-ai': 'xAI / Grok',
+          nvidia: 'NVIDIA',
+        };
+        const models: ModelOption[] = (orData.data || []).map((m: { id: string; name?: string }) => {
+          const provider = m.id.split('/')[0];
+          return {
+            value: m.id,
+            label: m.name || m.id,
+            group: providerNames[provider] ?? provider,
+          };
+        });
+        models.sort((a, b) => (a.group ?? '').localeCompare(b.group ?? '') || a.label.localeCompare(b.label));
+        setOpenrouterModels(models);
+      }
+
+      if (oaiRes.status === 'fulfilled' && oaiRes.value.ok) {
+        const oaiData = await oaiRes.value.json();
+        const models: ModelOption[] = (oaiData.data || []).map((m: { id: string }) => {
+          let group = 'GPT-4 Series';
+          if (m.id.startsWith('gpt-4.1')) group = 'GPT-4.1 Series';
+          else if (/^o[1-9]/.test(m.id)) group = 'Reasoning (o-series)';
+          else if (m.id.startsWith('gpt-3.5')) group = 'GPT-3.5 (older)';
+          return { value: m.id, label: m.id, group };
+        });
+        setOpenaiModels(models);
+      }
+    } catch (e) {
+      console.error('Failed to fetch models:', e);
+    } finally {
+      setFetchingModels(false);
+    }
+  };
+
   const saveSettings = async () => {
     try {
       await fetch('/api/settings', {
@@ -54,6 +143,9 @@ export function SettingsTab() {
         body: JSON.stringify({
           openai_key: openaiKey,
           openai_model: openaiModel,
+          main_chat_provider: mainChatProvider,
+          openrouter_key: openrouterKey,
+          openrouter_model: openrouterModel,
           baserow_enabled: baserowEnabled.toString(),
           baserow_url: baserowUrl,
           baserow_token: baserowToken,
@@ -67,7 +159,6 @@ export function SettingsTab() {
         }),
       });
 
-      // Immediately update the .env file with the new OpenAI API key
       if (openaiKey && openaiKey.startsWith('sk-')) {
         await fetch('/api/env', {
           method: 'POST',
@@ -76,7 +167,6 @@ export function SettingsTab() {
         });
       }
 
-      // Immediately update the .env file with the new Anthropic API key
       if (anthropicKey && anthropicKey.startsWith('sk-')) {
         await fetch('/api/env', {
           method: 'POST',
@@ -109,266 +199,387 @@ export function SettingsTab() {
     }
   };
 
+  // Reusable section header
+  function SectionHeader({ sectionKey, title, summary }: { sectionKey: string; title: string; summary?: string }) {
+    return (
+      <button
+        type="button"
+        onClick={() => toggleSection(sectionKey)}
+        className="flex w-full items-center justify-between p-5 text-left hover:bg-muted/40 transition-colors"
+      >
+        <div>
+          <h3 className="text-base font-semibold">{title}</h3>
+          {summary && <p className="text-xs text-muted-foreground mt-0.5">{summary}</p>}
+        </div>
+        <ChevronDown
+          className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-200 ${openSections[sectionKey] ? 'rotate-180' : ''}`}
+        />
+      </button>
+    );
+  }
+
   return (
     <div className="p-6 max-w-3xl">
       <h2 className="text-2xl font-bold mb-6">Settings</h2>
 
-      <div className="space-y-8">
-        {/* OpenAI Settings */}
-        <div className="border border-border rounded-lg p-6 space-y-4">
-          <h3 className="text-lg font-semibold">OpenAI Configuration</h3>
-          <div className="space-y-2">
-            <Label htmlFor="openai-key">API Key</Label>
-            <Input
-              id="openai-key"
-              type="password"
-              value={openaiKey}
-              onChange={(e) => setOpenaiKey(e?.target?.value ?? '')}
-              placeholder="sk-..."
-            />
-            <p className="text-sm text-muted-foreground">
-              Your OpenAI API key for AI-powered analysis. Get one at{' '}
-              <a
-                href="https://platform.openai.com/api-keys"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                platform.openai.com
-              </a>
-            </p>
-          </div>
+      <div className="space-y-3">
 
-          <div className="space-y-2">
-            <Label htmlFor="openai-model">Model</Label>
-            <select
-              id="openai-model"
-              value={openaiModel}
-              onChange={(e) => setOpenaiModel(e?.target?.value ?? 'gpt-4o-mini')}
-              className="w-full border border-border rounded-md p-2 bg-background text-foreground"
-            >
-              <option value="gpt-4o">GPT-4o (Most capable, higher cost)</option>
-              <option value="gpt-4o-mini">GPT-4o Mini (Balanced, recommended)</option>
-              <option value="gpt-4-turbo">GPT-4 Turbo (Previous generation)</option>
-              <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Fastest, lowest cost)</option>
-            </select>
-            <p className="text-sm text-muted-foreground">
-              Choose the OpenAI model to use for chat analysis. GPT-4o Mini offers the best balance of quality and cost.
-            </p>
-          </div>
-
-        </div>
-
-        {/* Claude/Anthropic Settings */}
-        <div className="border border-border rounded-lg p-6 space-y-4">
-          <h3 className="text-lg font-semibold">Claude (Anthropic) Configuration</h3>
-          <div className="space-y-2">
-            <Label htmlFor="anthropic-key">API Key</Label>
-            <Input
-              id="anthropic-key"
-              type="password"
-              value={anthropicKey}
-              onChange={(e) => setAnthropicKey(e?.target?.value ?? '')}
-              placeholder="sk-ant-..."
-            />
-            <p className="text-sm text-muted-foreground">
-              Your Anthropic API key for Claude AI. Get one at{' '}
-              <a
-                href="https://console.anthropic.com/settings/keys"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                console.anthropic.com
-              </a>
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="claude-model">Model</Label>
-            <select
-              id="claude-model"
-              value={claudeModel}
-              onChange={(e) => setClaudeModel(e?.target?.value ?? 'claude-3-5-sonnet-20241022')}
-              className="w-full border border-border rounded-md p-2 bg-background text-foreground"
-            >
-              <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Recommended)</option>
-              <option value="claude-3-opus-20240229">Claude 3 Opus (Most capable)</option>
-              <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
-              <option value="claude-3-haiku-20240307">Claude 3 Haiku (Fastest)</option>
-            </select>
-            <p className="text-sm text-muted-foreground">
-              Choose the Claude model. Claude 3.5 Sonnet offers excellent performance.
-            </p>
-          </div>
-        </div>
-
-        {/* Timeline Chat Settings */}
-        <div className="border border-border rounded-lg p-6 space-y-4">
-          <h3 className="text-lg font-semibold">Timeline Chat Preferences</h3>
-
-          <div className="space-y-2">
-            <Label htmlFor="timeline-api">Preferred AI Provider</Label>
-            <select
-              id="timeline-api"
-              value={timelineApiPreference}
-              onChange={(e) => setTimelineApiPreference(e?.target?.value ?? 'openai')}
-              className="w-full border border-border rounded-md p-2 bg-background text-foreground"
-            >
-              <option value="openai">OpenAI (GPT)</option>
-              <option value="claude">Claude (Anthropic)</option>
-            </select>
-            <p className="text-sm text-muted-foreground">
-              Choose which AI provider to use for the Timeline Assistant chat.
-            </p>
-          </div>
-        </div>
-
-        {/* System Prompts */}
-        <div className="border border-border rounded-lg p-6 space-y-6">
-          <div>
-            <h3 className="text-lg font-semibold mb-2">System Prompts</h3>
-            <p className="text-sm text-muted-foreground">
-              Customize how each chat assistant behaves. These prompts overlay the base AI behavior.
-            </p>
-          </div>
-
-          {/* Main Chat System Prompt */}
-          <div className="space-y-2">
-            <Label htmlFor="prompt-main" className="text-base font-medium">
-              Main Chat System Prompt
-            </Label>
-            <p className="text-sm text-muted-foreground">
-              For strategic case analysis and legal advisory conversations.
-            </p>
-            <textarea
-              id="prompt-main"
-              className="w-full min-h-[120px] border border-border rounded-md p-3 text-sm font-mono bg-background text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-              value={systemPromptMain}
-              onChange={(e) => setSystemPromptMain(e?.target?.value ?? '')}
-              placeholder="Example: You are my strategic legal advisor. Focus on risk analysis and case weaknesses."
-            />
-          </div>
-
-          {/* Narrative Chat System Prompt */}
-          <div className="space-y-2">
-            <Label htmlFor="prompt-narrative" className="text-base font-medium">
-              Narrative Chat System Prompt
-            </Label>
-            <p className="text-sm text-muted-foreground">
-              For narrative construction and persuasive legal writing assistance.
-            </p>
-            <textarea
-              id="prompt-narrative"
-              className="w-full min-h-[120px] border border-border rounded-md p-3 text-sm font-mono bg-background text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-              value={systemPromptNarrative}
-              onChange={(e) => setSystemPromptNarrative(e?.target?.value ?? '')}
-              placeholder="Example: You are a legal writing assistant. Help me craft compelling narratives backed by evidence."
-            />
-          </div>
-
-          {/* Timeline Chat System Prompt */}
-          <div className="space-y-2">
-            <Label htmlFor="prompt-timeline" className="text-base font-medium">
-              Timeline Chat System Prompt
-            </Label>
-            <p className="text-sm text-muted-foreground">
-              For the Timeline Assistant. Helps analyze chronology and suggest plot points.
-            </p>
-            <textarea
-              id="prompt-timeline"
-              className="w-full min-h-[120px] border border-border rounded-md p-3 text-sm font-mono bg-background text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-              value={systemPromptTimeline}
-              onChange={(e) => setSystemPromptTimeline(e?.target?.value ?? '')}
-              placeholder="Leave empty to use default timeline assistant behavior."
-            />
-          </div>
-
-          {/* Global Rules */}
-          <div className="space-y-2">
-            <Label htmlFor="global-rules" className="text-base font-medium">
-              Global Rules
-            </Label>
-            <p className="text-sm text-muted-foreground">
-              Rules prepended to ALL system prompts (main chat, narrative chat, and timeline chat).
-            </p>
-            <textarea
-              id="global-rules"
-              className="w-full min-h-[120px] border border-border rounded-md p-3 text-sm font-mono bg-background text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-              value={globalRules}
-              onChange={(e) => setGlobalRules(e?.target?.value ?? '')}
-              placeholder="Example: Always cite sources. Be concise. Use formal legal language."
-            />
-          </div>
-        </div>
-
-        {/* Baserow Settings */}
-        <div className="border border-border rounded-lg p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Baserow Integration</h3>
-            <Switch
-              checked={baserowEnabled}
-              onCheckedChange={setBaserowEnabled}
-            />
-          </div>
-
-          {baserowEnabled && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="baserow-url">Baserow URL</Label>
+        {/* OpenAI Configuration */}
+        <div className="border border-border rounded-lg overflow-hidden">
+          <SectionHeader
+            sectionKey="openai"
+            title="OpenAI Configuration"
+            summary={openaiKey ? `Key set · ${openaiModel}` : 'No key set'}
+          />
+          {openSections.openai && (
+            <div className="px-5 pb-5 space-y-4 border-t border-border">
+              <div className="space-y-2 pt-4">
+                <Label htmlFor="openai-key">API Key</Label>
                 <Input
-                  id="baserow-url"
-                  value={baserowUrl}
-                  onChange={(e) => setBaserowUrl(e?.target?.value ?? '')}
-                  placeholder="http://localhost:8000"
+                  id="openai-key"
+                  type="password"
+                  value={openaiKey}
+                  onChange={(e) => setOpenaiKey(e?.target?.value ?? '')}
+                  placeholder="sk-..."
                 />
                 <p className="text-sm text-muted-foreground">
-                  The URL where your local Baserow instance is running
+                  Get one at{' '}
+                  <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                    platform.openai.com
+                  </a>
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="baserow-token">API Token</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="openai-model">Model</Label>
+                  <Button variant="ghost" size="sm" onClick={fetchModels} disabled={fetchingModels} className="h-6 text-xs px-2">
+                    {fetchingModels ? 'Loading…' : '↻ Refresh'}
+                  </Button>
+                </div>
+                <Select
+                  id="openai-model"
+                  value={openaiModel}
+                  onValueChange={setOpenaiModel}
+                  options={openaiModels.length > 0 ? openaiModels : [
+                    { value: 'gpt-4o-mini', label: 'gpt-4o-mini (default — refresh to load full list)' },
+                  ]}
+                />
+                <p className="text-sm text-muted-foreground">
+                  Only applies when Main Chat Provider is set to OpenAI.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* OpenRouter Configuration */}
+        <div className="border border-border rounded-lg overflow-hidden">
+          <SectionHeader
+            sectionKey="openrouter"
+            title="OpenRouter Configuration"
+            summary={openrouterKey ? `Key set · ${openrouterModel}` : 'No key set'}
+          />
+          {openSections.openrouter && (
+            <div className="px-5 pb-5 space-y-4 border-t border-border">
+              <div className="space-y-2 pt-4">
+                <Label htmlFor="openrouter-key">API Key</Label>
                 <Input
-                  id="baserow-token"
+                  id="openrouter-key"
                   type="password"
-                  value={baserowToken}
-                  onChange={(e) => setBaserowToken(e?.target?.value ?? '')}
-                  placeholder="Your Baserow API token"
+                  value={openrouterKey}
+                  onChange={(e) => setOpenrouterKey(e?.target?.value ?? '')}
+                  placeholder="sk-or-..."
+                />
+                <p className="text-sm text-muted-foreground">
+                  Get one at{' '}
+                  <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                    openrouter.ai/keys
+                  </a>
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="openrouter-model">Model</Label>
+                  <Button variant="ghost" size="sm" onClick={fetchModels} disabled={fetchingModels} className="h-6 text-xs px-2">
+                    {fetchingModels ? 'Loading…' : `↻ Refresh${openrouterModels.length > 0 ? ` (${openrouterModels.length})` : ''}`}
+                  </Button>
+                </div>
+                <Select
+                  id="openrouter-model"
+                  value={openrouterModel}
+                  onValueChange={setOpenrouterModel}
+                  options={openrouterModels.length > 0 ? openrouterModels : [
+                    { value: 'anthropic/claude-3.7-sonnet', label: 'anthropic/claude-3.7-sonnet (default — refresh to load full list)' },
+                  ]}
+                />
+                <p className="text-sm text-muted-foreground">
+                  {openrouterModels.length > 0
+                    ? `${openrouterModels.length} models loaded from OpenRouter.`
+                    : 'Hit Refresh to load the full model list from OpenRouter.'}{' '}
+                  Browse at{' '}
+                  <a href="https://openrouter.ai/models" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                    openrouter.ai/models
+                  </a>.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Claude / Anthropic Configuration */}
+        <div className="border border-border rounded-lg overflow-hidden">
+          <SectionHeader
+            sectionKey="claude"
+            title="Claude (Anthropic) Configuration"
+            summary={anthropicKey ? `Key set · ${claudeModel}` : 'No key set'}
+          />
+          {openSections.claude && (
+            <div className="px-5 pb-5 space-y-4 border-t border-border">
+              <div className="space-y-2 pt-4">
+                <Label htmlFor="anthropic-key">API Key</Label>
+                <Input
+                  id="anthropic-key"
+                  type="password"
+                  value={anthropicKey}
+                  onChange={(e) => setAnthropicKey(e?.target?.value ?? '')}
+                  placeholder="sk-ant-..."
+                />
+                <p className="text-sm text-muted-foreground">
+                  Get one at{' '}
+                  <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                    console.anthropic.com
+                  </a>
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="claude-model">Model</Label>
+                <Select
+                  id="claude-model"
+                  value={claudeModel}
+                  onValueChange={setClaudeModel}
+                  options={[
+                    { value: 'claude-3-7-sonnet-20250219', label: 'Claude 3.7 Sonnet (Latest, recommended)' },
+                    { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
+                    { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku (Fast)' },
+                    { value: 'claude-3-opus-20240229', label: 'Claude 3 Opus (Most powerful)' },
+                  ]}
+                />
+                <p className="text-sm text-muted-foreground">
+                  Used for Timeline Chat when provider is set to Claude.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Main Chat Provider */}
+        <div className="border border-border rounded-lg overflow-hidden">
+          <SectionHeader
+            sectionKey="provider"
+            title="Main Chat — Provider"
+            summary={mainChatProvider === 'openai' ? 'Using OpenAI' : 'Using OpenRouter'}
+          />
+          {openSections.provider && (
+            <div className="px-5 pb-5 space-y-4 border-t border-border">
+              <div className="space-y-2 pt-4">
+                <Label htmlFor="main-provider">AI Provider for Main Chat</Label>
+                <Select
+                  id="main-provider"
+                  value={mainChatProvider}
+                  onValueChange={setMainChatProvider}
+                  options={[
+                    { value: 'openai', label: 'OpenAI (uses OpenAI key + model above)' },
+                    { value: 'openrouter', label: 'OpenRouter (access 200+ models via one key)' },
+                  ]}
+                />
+                <p className="text-sm text-muted-foreground">
+                  OpenRouter lets you use Claude, Gemini, Llama, Mistral and more — all through a single API key.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Timeline Chat Preferences */}
+        <div className="border border-border rounded-lg overflow-hidden">
+          <SectionHeader
+            sectionKey="timeline"
+            title="Timeline Chat — Provider"
+            summary={timelineApiPreference === 'openai' ? 'Using OpenAI' : 'Using Claude'}
+          />
+          {openSections.timeline && (
+            <div className="px-5 pb-5 space-y-4 border-t border-border">
+              <div className="space-y-2 pt-4">
+                <Label htmlFor="timeline-api">Preferred AI Provider</Label>
+                <Select
+                  id="timeline-api"
+                  value={timelineApiPreference}
+                  onValueChange={setTimelineApiPreference}
+                  options={[
+                    { value: 'openai', label: 'OpenAI (GPT)' },
+                    { value: 'claude', label: 'Claude (Anthropic)' },
+                  ]}
+                />
+                <p className="text-sm text-muted-foreground">
+                  Which AI runs the Timeline Assistant chat.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* System Prompts */}
+        <div className="border border-border rounded-lg overflow-hidden">
+          <SectionHeader
+            sectionKey="prompts"
+            title="System Prompts"
+            summary={
+              [systemPromptMain, systemPromptNarrative, systemPromptTimeline, globalRules].filter(Boolean).length > 0
+                ? `${[systemPromptMain, systemPromptNarrative, systemPromptTimeline, globalRules].filter(Boolean).length} prompt(s) configured`
+                : 'None set — using defaults'
+            }
+          />
+          {openSections.prompts && (
+            <div className="px-5 pb-5 space-y-5 border-t border-border">
+              <p className="text-sm text-muted-foreground pt-4">
+                These overlay the default AI behaviour for each chat type.
+              </p>
+
+              <div className="space-y-2">
+                <Label htmlFor="prompt-main" className="font-medium">Main Chat</Label>
+                <textarea
+                  id="prompt-main"
+                  className="w-full min-h-[100px] border border-border rounded-md p-3 text-sm font-mono bg-background text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                  value={systemPromptMain}
+                  onChange={(e) => setSystemPromptMain(e?.target?.value ?? '')}
+                  placeholder="e.g. You are my strategic legal advisor. Focus on risk analysis."
                 />
               </div>
 
-              <Button variant="outline" onClick={testBaserow}>
-                Test Connection
-              </Button>
+              <div className="space-y-2">
+                <Label htmlFor="prompt-narrative" className="font-medium">Narrative Chat</Label>
+                <textarea
+                  id="prompt-narrative"
+                  className="w-full min-h-[100px] border border-border rounded-md p-3 text-sm font-mono bg-background text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                  value={systemPromptNarrative}
+                  onChange={(e) => setSystemPromptNarrative(e?.target?.value ?? '')}
+                  placeholder="e.g. Help me craft compelling narratives backed by evidence."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="prompt-timeline" className="font-medium">Timeline Chat</Label>
+                <textarea
+                  id="prompt-timeline"
+                  className="w-full min-h-[100px] border border-border rounded-md p-3 text-sm font-mono bg-background text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                  value={systemPromptTimeline}
+                  onChange={(e) => setSystemPromptTimeline(e?.target?.value ?? '')}
+                  placeholder="Leave empty to use default timeline assistant behaviour."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="global-rules" className="font-medium">Global Rules</Label>
+                <p className="text-xs text-muted-foreground">Prepended to every prompt across all chats.</p>
+                <textarea
+                  id="global-rules"
+                  className="w-full min-h-[100px] border border-border rounded-md p-3 text-sm font-mono bg-background text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                  value={globalRules}
+                  onChange={(e) => setGlobalRules(e?.target?.value ?? '')}
+                  placeholder="e.g. Always cite sources. Be concise. Use formal legal language."
+                />
+              </div>
             </div>
           )}
-
-          <p className="text-sm text-muted-foreground">
-            Enable Baserow to store structured case data in tables. Requires Docker Desktop to be running.
-          </p>
         </div>
 
-        {/* Storage Info */}
-        <div className="border border-border rounded-lg p-6 space-y-4">
-          <h3 className="text-lg font-semibold">Local Storage</h3>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Database:</span>
-              <span className="font-mono">./data/legal_assistant.db</span>
+        {/* Baserow Integration */}
+        <div className="border border-border rounded-lg overflow-hidden">
+          <button
+            type="button"
+            onClick={() => toggleSection('baserow')}
+            className="flex w-full items-center justify-between p-5 text-left hover:bg-muted/40 transition-colors"
+          >
+            <div>
+              <h3 className="text-base font-semibold">Baserow Integration</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">{baserowEnabled ? 'Enabled' : 'Disabled'}</p>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Vector Store:</span>
-              <span className="font-mono">./data/chroma_data/</span>
+            <div className="flex items-center gap-3">
+              <span onClick={(e) => e.stopPropagation()}>
+                <Switch checked={baserowEnabled} onCheckedChange={setBaserowEnabled} />
+              </span>
+              <ChevronDown
+                className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-200 ${openSections.baserow ? 'rotate-180' : ''}`}
+              />
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Evidence Files:</span>
-              <span className="font-mono">./data/evidence/</span>
+          </button>
+          {openSections.baserow && (
+            <div className="px-5 pb-5 space-y-4 border-t border-border">
+              <p className="text-sm text-muted-foreground pt-4">
+                Store structured case data in Baserow tables. Requires Docker Desktop running locally.
+              </p>
+              {baserowEnabled && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="baserow-url">Baserow URL</Label>
+                    <Input
+                      id="baserow-url"
+                      value={baserowUrl}
+                      onChange={(e) => setBaserowUrl(e?.target?.value ?? '')}
+                      placeholder="http://localhost:8000"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="baserow-token">API Token</Label>
+                    <Input
+                      id="baserow-token"
+                      type="password"
+                      value={baserowToken}
+                      onChange={(e) => setBaserowToken(e?.target?.value ?? '')}
+                      placeholder="Your Baserow API token"
+                    />
+                  </div>
+                  <Button variant="outline" onClick={testBaserow}>
+                    Test Connection
+                  </Button>
+                </div>
+              )}
             </div>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            All data is stored locally on your machine. No cloud storage.
-          </p>
+          )}
+        </div>
+
+        {/* Local Storage */}
+        <div className="border border-border rounded-lg overflow-hidden">
+          <SectionHeader
+            sectionKey="storage"
+            title="Local Storage"
+            summary="All data stored on your machine — no cloud"
+          />
+          {openSections.storage && (
+            <div className="px-5 pb-5 border-t border-border">
+              <div className="space-y-2 pt-4">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Database:</span>
+                  <span className="font-mono text-xs">%APPDATA%\LegalMind\data\legal_assistant.db</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Vector Store:</span>
+                  <span className="font-mono text-xs">%APPDATA%\LegalMind\data\vectors\</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Evidence Files:</span>
+                  <span className="font-mono text-xs">%APPDATA%\LegalMind\data\evidence\</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Chat History:</span>
+                  <span className="font-mono text-xs">%APPDATA%\legal_assistant_desktop\chats\</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <Button onClick={saveSettings} size="lg" className="w-full">

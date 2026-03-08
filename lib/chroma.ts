@@ -5,8 +5,9 @@
 
 import fs from 'fs';
 import path from 'path';
+import { getDataDir } from '@/lib/paths';
 
-const VECTOR_DIR = path.join(process.cwd(), 'data', 'vectors');
+const VECTOR_DIR = path.join(getDataDir(), 'vectors');
 
 if (!fs.existsSync(VECTOR_DIR)) {
   fs.mkdirSync(VECTOR_DIR, { recursive: true });

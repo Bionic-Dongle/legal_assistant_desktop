@@ -23,6 +23,7 @@
     "chromadb": "^3.0.17",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "core-util-is": "^1.0.3",
     "date-fns": "^4.1.0",
     "diff-match-patch": "^1.0.5",
     "electron-is-dev": "^3.0.1",
@@ -70,22 +71,12 @@
       ".next/**/*",
       "electron/**/*",
       "public/**/*",
-      "data/**/*",
       "node_modules/**/*",
       "package.json"
     ],
     "directories": {
       "buildResources": "public"
-    },
-    "extraResources": [
-      {
-        "from": "data",
-        "to": "data",
-        "filter": [
-          "**/*"
-        ]
-      }
-    ]
+    }
   },
   "version": "1.0.0",
   "description": "100% local desktop application for legal case analysis and narrative management",

@@ -3,8 +3,9 @@ import fs from 'fs';
 import path from 'path';
 import db from '@/lib/db';
 import { addDocuments } from '@/lib/chroma';
+import { getDataDir } from '@/lib/paths';
 
-const QUEUE_DIR  = path.join(process.cwd(), 'data', 'import-queue');
+const QUEUE_DIR  = path.join(getDataDir(), 'import-queue');
 const QUEUE_FILE = path.join(QUEUE_DIR, 'email-import-queue.json');
 const ARCHIVE_FILE = path.join(QUEUE_DIR, 'email-import-queue-processed.json');
 
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
     const errors: string[] = [];
     const doneItems: any[] = [];
 
-    const evidenceDir = path.join(process.cwd(), 'data', 'evidence');
+    const evidenceDir = path.join(getDataDir(), 'evidence');
     if (!fs.existsSync(evidenceDir)) fs.mkdirSync(evidenceDir, { recursive: true });
 
     for (const item of items) {

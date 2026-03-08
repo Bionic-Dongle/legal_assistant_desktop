@@ -51,15 +51,29 @@ export async function POST(request: Request) {
     let response: string = "";
     try {
       const allSettings = db.prepare("SELECT key, value FROM settings").all() as { key: string; value: string }[];
-      const found = allSettings.find(s => s.key === "openai_key");
-      const apiKey = (process.env.OPENAI_API_KEY || found?.value?.trim());
 
-      console.log("🔍 Settings check:", {
-        foundKey: found?.key,
-        hasValue: !!found?.value,
-        valuePrefix: found?.value?.substring(0, 10),
-        finalApiKey: apiKey ? `${apiKey.substring(0, 10)}...` : 'NOT FOUND'
-      });
+      // Determine provider (openai or openrouter)
+      const providerSetting = allSettings.find(s => s.key === "main_chat_provider");
+      const provider = providerSetting?.value?.trim() || "openai";
+
+      let apiKey: string | undefined;
+      let baseURL: string | undefined;
+      let selectedModel: string;
+
+      if (provider === "openrouter") {
+        const orKey = allSettings.find(s => s.key === "openrouter_key");
+        apiKey = orKey?.value?.trim();
+        baseURL = "https://openrouter.ai/api/v1";
+        const orModel = allSettings.find(s => s.key === "openrouter_model");
+        selectedModel = orModel?.value?.trim() || "anthropic/claude-3.7-sonnet";
+        console.log("🔍 Using OpenRouter:", { model: selectedModel, hasKey: !!apiKey });
+      } else {
+        const found = allSettings.find(s => s.key === "openai_key");
+        apiKey = process.env.OPENAI_API_KEY || found?.value?.trim();
+        const modelSetting = allSettings.find(s => s.key === "openai_model");
+        selectedModel = modelSetting?.value?.trim() || "gpt-4o-mini";
+        console.log("🔍 Using OpenAI:", { model: selectedModel, hasKey: !!apiKey });
+      }
 
       // --- Determine base system prompt ---
       // --- Determine base system prompt (check all possible key variants) ---
@@ -235,13 +249,17 @@ This is NON-NEGOTIABLE. Every quote from evidence MUST be cited with the [📄 f
         console.warn("⚠️ Missing OpenAI key — using mock response.");
         response = generateMockResponse(message, context);
       } else {
-        // Get selected model from settings (default to gpt-4o-mini)
-        const modelSetting = allSettings.find(s => s.key === "openai_model");
-        const selectedModel = modelSetting?.value?.trim() || "gpt-4o-mini";
-
-        console.log("🚀 Attempting OpenAI API call with model:", selectedModel);
+        console.log(`🚀 Attempting API call — provider: ${provider}, model: ${selectedModel}`);
         const OpenAI = (await import("openai")).default;
-        const openai = new OpenAI({ apiKey });
+        const clientOptions: any = { apiKey };
+        if (baseURL) clientOptions.baseURL = baseURL;
+        if (provider === "openrouter") {
+          clientOptions.defaultHeaders = {
+            "HTTP-Referer": "https://legalmind.app",
+            "X-Title": "LegalMind Desktop",
+          };
+        }
+        const openai = new OpenAI(clientOptions);
 
         // Fetch recent conversation history to maintain continuity
         const recentMessages = db.prepare(
@@ -266,7 +284,7 @@ This is NON-NEGOTIABLE. Every quote from evidence MUST be cited with the [📄 f
         });
 
         response = completion?.choices?.[0]?.message?.content?.trim() || "⚠️ Empty response from model.";
-        console.log("✅ OpenAI response received successfully");
+        console.log(`✅ Response received from ${provider}`);
       }
     } catch (error: any) {
       console.error("💥 Error in chat processing:", {
@@ -280,7 +298,7 @@ This is NON-NEGOTIABLE. Every quote from evidence MUST be cited with the [📄 f
       if (error?.status === 401) {
         response = "❌ **OpenAI API Key Error**\n\nYour API key is invalid or has been revoked. Please:\n\n1. Go to https://platform.openai.com/api-keys\n2. Create a new API key\n3. Copy the entire key (starts with 'sk-')\n4. Go to Settings tab and paste it in the API Key field\n5. Click 'Save Settings'\n6. Make sure your OpenAI account has billing enabled\n\nThen try your message again.";
       } else if (error?.status === 429) {
-        response = "❌ **Rate Limit Exceeded**\n\nYou've exceeded your OpenAI API rate limit or quota. This could mean:\n\n1. Too many requests in a short time (wait a minute and try again)\n2. Monthly quota exceeded (check your OpenAI billing dashboard)\n3. Free tier limits reached (upgrade your OpenAI plan)\n\nVisit https://platform.openai.com/account/billing to check your usage.";
+        response = "❌ **Rate Limit / Quota Exceeded**\n\nYou've hit a usage limit. Check:\n\n1. Too many requests in a short time — wait a minute and try again\n2. Monthly quota exceeded — check your billing dashboard\n3. OpenAI: https://platform.openai.com/account/billing\n4. OpenRouter: https://openrouter.ai/credits\n\nYou can also switch providers in Settings → Main Chat Provider.";
       } else if (error?.status === 403) {
         response = "❌ **Access Denied**\n\nYour API key doesn't have permission to access this model. This usually means:\n\n1. Your key is for a different organization\n2. The model requires a paid plan\n3. Your account doesn't have access to this model\n\nCheck your OpenAI dashboard or try selecting a different model in Settings.";
       } else if (error?.message?.includes('fetch') || error?.message?.includes('network')) {

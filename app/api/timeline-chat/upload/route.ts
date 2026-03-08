@@ -3,6 +3,7 @@ import db from '@/lib/db';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { getDataDir } from '@/lib/paths';
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Ensure data directory exists
-    const dataDir = path.join(process.cwd(), 'data', 'timeline-documents');
+    const dataDir = path.join(getDataDir(), 'timeline-documents');
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }

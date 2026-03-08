@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
-import path from 'path';
+import { getEnvFilePath } from '@/lib/paths';
 
 // Helper function to safely update or insert a key-value pair in the .env file
 function updateEnvFile(key: string, value: string) {
-  const envPath = path.resolve(process.cwd(), '.env');
+  const envPath = getEnvFilePath();
   let envContent = '';
 
   try {

@@ -5,8 +5,9 @@ import { addDocuments } from '@/lib/chroma';
 import { extractText } from '@/lib/extract';
 import fs from 'fs';
 import path from 'path';
+import { getDataDir } from '@/lib/paths';
 
-const EVIDENCE_DIR = path.join(process.cwd(), 'data', 'evidence');
+const EVIDENCE_DIR = path.join(getDataDir(), 'evidence');
 
 if (!fs.existsSync(EVIDENCE_DIR)) {
   fs.mkdirSync(EVIDENCE_DIR, { recursive: true });
