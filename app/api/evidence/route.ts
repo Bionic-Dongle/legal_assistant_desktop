@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { addDocuments } from '@/lib/chroma';
+import { extractText } from '@/lib/extract';
 import fs from 'fs';
 import path from 'path';
 
@@ -71,8 +72,8 @@ export async function POST(request: Request) {
     const filepath = path.join(EVIDENCE_DIR, filename);
     fs.writeFileSync(filepath, buffer);
 
-    // Extract text for embedding
-    const content = buffer.toString("utf-8").substring(0, 10000);
+    // Extract text for embedding — proper PDF/DOCX/text extraction
+    const { text: content } = await extractText(buffer, file.name, 50000);
 
     // Generate OpenAI embedding vector
     let embeddingVector = [];
