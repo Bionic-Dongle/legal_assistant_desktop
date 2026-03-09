@@ -20,7 +20,14 @@
       "Bash(powershell:*)",
       "Bash(node update-contradiction-prompt.js:*)",
       "Bash(node:*)",
-      "Bash(npx tsc --noEmit)"
+      "Bash(npx tsc --noEmit)",
+      "Bash(git push:*)",
+      "Read(**)",
+      "Glob(**)",
+      "Grep(**)",
+      "mcp__Desktop_Commander__read_process_output",
+      "mcp__Desktop_Commander__read_file",
+      "mcp__Claude_Preview__preview_start"
     ],
     "deny": [],
     "ask": []

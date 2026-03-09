@@ -8,6 +8,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Critical Protocol: Every Session Must Follow
 
+### 0. Session Start (MANDATORY)
+
+Read `notes/CURRENT-STATE.md` before doing anything else. This is how you get up to speed — do not ask the user to brief you.
+
+### 0b. Session End (MANDATORY)
+
+Before the session ends, update `notes/CURRENT-STATE.md`:
+- Add a new section with today's date
+- List everything built or decided this session (plain English)
+- Update the "Immediate Next Steps" section to reflect current state
+- If something broke and was fixed, note the fix so it's not forgotten
+
+The user should never have to re-explain context. Keep the notes current.
+
+---
+
 ### 1. Session Check-In (MANDATORY)
 
 Before making ANY code changes, you MUST:
