@@ -63,6 +63,8 @@
   "build": {
     "appId": "com.legalmind.app",
     "productName": "LegalMind",
+    "publish": null,
+    "copyright": "Copyright © 2025 Chippo",
     "win": {
       "target": "nsis",
       "icon": "public/icon.ico"
@@ -80,5 +82,5 @@
   },
   "version": "1.0.0",
   "description": "100% local desktop application for legal case analysis and narrative management",
-  "author": "Legal Assistant Team"
+  "author": "Chippo"
 }

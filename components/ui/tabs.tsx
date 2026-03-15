@@ -14,7 +14,9 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "sticky top-0 z-50 inline-flex h-12 items-center justify-start rounded-none bg-muted p-1 text-muted-foreground w-full border-b border-border backdrop-blur supports-[backdrop-filter]:bg-muted/90",
+      "sticky top-0 z-50 inline-flex h-11 items-center justify-start rounded-none w-full",
+      "bg-[hsl(224_48%_5%)] border-b border-[hsl(222_25%_14%)]",
+      "backdrop-blur supports-[backdrop-filter]:bg-[hsl(224_48%_5%/0.95)]",
       className
     )}
     {...props}
@@ -29,7 +31,14 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap rounded-none px-6 py-2 text-base font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm border-b-2 border-transparent data-[state=active]:border-primary",
+      "inline-flex items-center justify-center whitespace-nowrap rounded-none px-6 py-2",
+      "text-sm font-medium text-muted-foreground",
+      "ring-offset-background transition-all",
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+      "disabled:pointer-events-none disabled:opacity-50",
+      "border-b-2 border-transparent",
+      "data-[state=active]:text-neon-cyan data-[state=active]:border-neon-cyan",
+      "hover:text-foreground",
       className
     )}
     {...props}

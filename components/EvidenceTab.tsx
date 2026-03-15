@@ -6,6 +6,7 @@ import { Upload, FileText, Trash2, Eye, Bot } from 'lucide-react';
 import { toast } from 'sonner';
 import { EvidenceUploadBotPanel } from './EvidenceUploadBotPanel';
 import { ImportQueuePanel } from './ImportQueuePanel';
+import { ScanPanel } from './ScanPanel';
 
 interface Evidence {
   id: string;
@@ -142,6 +143,7 @@ export function EvidenceTab({ caseId }: { caseId: string }) {
       <div className={`${showBotPanel ? 'w-2/3' : 'w-full'} flex flex-col transition-all`}>
         {/* Cowork import queue banner — only visible when emails are waiting */}
       <ImportQueuePanel caseId={caseId} onImportComplete={loadEvidence} />
+      <ScanPanel caseId={caseId} onQueueUpdated={loadEvidence} />
 
       {/* Upload Areas - Fixed at top */}
         <div className="p-6 pb-3 flex-shrink-0">

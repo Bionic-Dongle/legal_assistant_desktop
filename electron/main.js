@@ -6,7 +6,7 @@ const fs = require("fs");
 const appDataEnvPath = path.join(os.homedir(), "AppData", "Roaming", "LegalMind", ".env");
 require("dotenv").config({ path: appDataEnvPath });
 
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
 
 let store;
 let mainWindow;
@@ -231,11 +231,28 @@ ipcMain.handle("archive-chat", async (event, filename) => {
 
 ipcMain.handle("open-file", async (event, filepath) => {
   try {
-    const { shell } = require("electron");
     await shell.openPath(filepath);
     return { success: true };
   } catch (err) {
     console.error("Failed to open file", err);
     return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle("select-folder", async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ["openDirectory"],
+    title: "Select folder to scan",
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+
+ipcMain.handle("open-external-url", async (event, url) => {
+  try {
+    await shell.openExternal(url);
+    return true;
+  } catch (err) {
+    console.error("Failed to open external URL", err);
+    return false;
   }
 });

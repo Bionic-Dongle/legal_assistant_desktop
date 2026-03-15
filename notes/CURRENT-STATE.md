@@ -132,9 +132,69 @@ These are not code changes — they're how we work together going forward:
 
 ---
 
+## What Was Done This Session (2026-03-14)
+
+14. **Cyberpunk UI reskin — fonts + scanlines + animations applied**
+    - `app/layout.tsx` — swapped Inter for Orbitron (headings) + Share Tech Mono (body) via `next/font/google`. Fonts bundle at build time, work offline in the packaged app.
+    - `app/globals.css` — added CRT scanline overlay (`body::before` repeating gradient), flicker keyframe (subtle opacity dip every 10s), pulse-glow keyframe (breathing text-shadow), slide-up keyframe (fade-in from below). Body font set to Share Tech Mono, h1/h2/h3 set to Orbitron uppercase.
+    - The neon color system, glow utilities, badges etc. were already in place from a prior session — this session wired in the missing pieces.
+
+15. **package.json installer metadata updated**
+    - Added `"publish": null` and `"copyright": "Copyright © 2025 Chippo"` to the electron-builder build config.
+    - `author` was already "Chippo". Version stays at 1.0.0.
+
+16. **Packaging attempt — blocked, not completed**
+    - `yarn package` starts with `next build` (succeeded) then tries to rebuild `better-sqlite3` native module for Electron.
+    - Failed with `EPERM: operation not permitted` — the `.node` file was locked because the app was still running.
+    - **Fix**: close LegalMind/`yarn dev` first, then run `yarn package`. That's it — no code changes needed.
+
+---
+
+---
+
+## What Was Built This Session (2026-03-15)
+
+17. **Cowork replacement — native scan pipeline**
+    - `lib/triage.ts` — AI triage function (OpenAI, structured JSON output) used by all scan routes
+    - `app/api/evidence/scan-folders/route.ts` — walks local folders (batch 30), extracts text, runs triage, writes to import queue
+    - `app/api/evidence/scan-email/route.ts` — Gmail scanner with date range + sender filter
+    - `app/api/evidence/gmail-auth/route.ts` — OAuth2 for Gmail (start/callback/status/disconnect)
+    - `app/api/evidence/outlook-auth/route.ts` — OAuth2 for Microsoft Graph / Outlook
+    - `app/api/evidence/scan-outlook/route.ts` — Outlook/Hotmail message scanner
+    - `components/ScanPanel.tsx` — collapsible UI in Evidence tab: Browse folders, date range dropdown, sender filter, Gmail + Outlook sections with OAuth setup
+    - `electron/main.js` + `electron/preload.js` — added `select-folder` and `open-external-url` IPC handlers
+    - Scan + import are chained — one button does everything, no separate "Import Now" step needed
+
+18. **Legal reasoning engine — full pipeline**
+    - `lib/signals-registry.ts` — 40-signal taxonomy across 7 legal categories
+    - `lib/claim-detection-library.ts` — weighted confidence scoring engine, 7 causes of action
+    - `lib/doctrinal-frameworks.ts` — static doctrinal framework registry (constructive trust, proprietary estoppel, fiduciary duty, Barnes v Addy, litigation guardian, POA breach, personal costs)
+    - `lib/signal-extractor.ts` — extracts signals from evidence text + metadata + document-type heuristics
+    - `lib/austlii.ts` — AustLII search + HTML extraction + AI summarisation pipeline
+    - `app/api/legal/analyse/route.ts` — full on-demand analysis endpoint (returns claims + frameworks + authorities)
+    - `app/api/chat/route.ts` — legal context (detected claims + active frameworks) now injected into every chat system prompt automatically
+
+19. **CaseTheoryPanel sidebar**
+    - `components/CaseTheoryPanel.tsx` — collapsible right-side panel in the Chat tab
+    - Auto-runs signal extraction on load (fast, no AustLII)
+    - Shows detected claims with colour-coded confidence bars (red/amber/cyan)
+    - Each claim expands to show triggered signals + all framework elements to establish
+    - "Fetch AustLII" button retrieves and displays relevant case law authorities with expandable cards
+    - "View on AustLII →" opens the case in the system browser
+    - `components/ChatTab.tsx` — restructured to side-by-side layout (chat left, panel right, 320px)
+    - Collapse/expand toggle button on the divider
+
+---
+
 ## Immediate Next Steps (do these first next session)
 
-### 1. Download GDrive content and run Cowork
+### 0. Package the app (do this first — 5 mins)
+- Close LegalMind (stop `yarn dev`, close Electron window)
+- Run: `yarn package`
+- Output: `release/LegalMind-Setup-1.0.0.exe`
+- Install it, done
+
+### 1. GDrive evidence run (Cowork is now replaced — use the Scan Folders button)
 This is the big ingestion run. Everything is ready — just needs the files on disk.
 
 **Step 1 — Download from Google Drive:**
@@ -143,18 +203,11 @@ This is the big ingestion run. Everything is ready — just needs the files on d
 - Unzip into: `data/gdrive-import/plaintiff/`
 - Repeat for the opposition folder → unzip into: `data/gdrive-import/opposition/`
 
-**Step 2 — Run Cowork:**
-- Open Claude Desktop → Cowork tab
-- Paste the triage prompt from COWORK.md exactly as written
-- Tell Cowork to also process your email accounts
-- Let it run — it processes emails + GDrive docs + any images
-- When done, it writes to `data/import-queue/email-import-queue.json`
-
-**Step 3 — Import into LegalMind:**
-- Open LegalMind → Evidence tab
-- Blue banner appears: "X items waiting in Cowork import queue"
-- Click Import Now
-- Done — everything lands fully labelled
+**Step 2 — Scan into LegalMind (no Cowork needed):**
+- Open LegalMind → Evidence tab → Scan panel
+- Click Browse for both plaintiff and opposition folders
+- Click Import Folders — scans, triages, and ingests in one step
+- For email: set date range dropdown + optional sender filter → Import Gmail or Import Outlook
 
 ### 2. Check OpenAI API key is current
 Go to Settings in LegalMind. If the key is expired, refresh it at platform.openai.com

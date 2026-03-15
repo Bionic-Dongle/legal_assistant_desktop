@@ -11,10 +11,14 @@ export interface ButtonProps
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'default', size = 'default', ...props }, ref) => {
     const variants = {
-      default: 'bg-primary text-primary-foreground hover:bg-primary/90',
-      outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
-      ghost: 'hover:bg-accent hover:text-accent-foreground',
-      destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
+      default:
+        'bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/50 hover:bg-neon-cyan/20 hover:border-neon-cyan hover:shadow-neon-cyan transition-all',
+      outline:
+        'border border-border bg-transparent text-foreground hover:border-neon-cyan/60 hover:text-neon-cyan hover:bg-neon-cyan/5 transition-all',
+      ghost:
+        'bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground transition-all',
+      destructive:
+        'bg-destructive/10 text-destructive border border-destructive/50 hover:bg-destructive/20 hover:shadow-neon-pink transition-all',
     }
 
     const sizes = {
@@ -27,7 +31,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <button
         className={cn(
-          'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+          'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium',
+          'ring-offset-background',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+          'disabled:pointer-events-none disabled:opacity-50',
           variants[variant],
           sizes[size],
           className

@@ -3,6 +3,9 @@ import { NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { queryDocuments } from '@/lib/chroma';
 import { buildCaseContext } from '@/lib/context';
+import { extractSignalsFromEvidenceSet } from '@/lib/signal-extractor';
+import { detectClaims } from '@/lib/claim-detection-library';
+import { getFrameworksForClaims, buildFrameworkContext } from '@/lib/doctrinal-frameworks';
 
 export async function POST(request: Request) {
   try {
@@ -194,6 +197,36 @@ When user asks "What do they accuse me of?" - carefully read the evidence contex
           }).join('\n\n')
         : "No evidence uploaded yet.";
 
+      // --- Legal signal extraction + claim detection (inline, no HTTP call) ---
+      let legalAnalysisContext = '';
+      try {
+        const evidenceForAnalysis = db.prepare(`
+          SELECT extracted_text, key_claims, key_entities, legal_significance,
+                 document_type, document_tone, actual_author, memory_type
+          FROM evidence WHERE case_id = ? AND extracted_text IS NOT NULL
+        `).all(caseId) as any[];
+
+        const parsedEvidence = evidenceForAnalysis.map((e: any) => ({
+          ...e,
+          key_claims:   jsonTryParse(e.key_claims,   []),
+          key_entities: jsonTryParse(e.key_entities, []),
+        }));
+
+        const { signals } = extractSignalsFromEvidenceSet(parsedEvidence);
+        const detectedClaims = detectClaims(signals);
+
+        if (detectedClaims.length > 0) {
+          const frameworkIds = detectedClaims.map(c => c.framework_id);
+          const frameworks   = getFrameworksForClaims(frameworkIds);
+          const claimsText   = `## Detected Legal Claims\n${detectedClaims.map(c =>
+            `- **${c.label}** (confidence: ${Math.round(c.confidence * 100)}%): ${c.description}`
+          ).join('\n')}`;
+          legalAnalysisContext = [claimsText, buildFrameworkContext(frameworks)].filter(Boolean).join('\n\n');
+        }
+      } catch (e) {
+        console.warn('[chat] Legal analysis failed silently:', e);
+      }
+
       // --- Assemble final system prompt ---
       const providerLabel = provider === 'openrouter' ? 'OpenRouter' : 'OpenAI';
       const systemPrompt = `You are running on: ${selectedModel} (via ${providerLabel})
@@ -244,6 +277,9 @@ ${insightsContext}
 
 ### Saved Arguments
 ${argumentsContext}
+
+### Legal Analysis — Detected Claims & Applicable Frameworks
+${legalAnalysisContext || 'No legal claims detected yet — upload and analyse evidence to activate this section.'}
 
 ### Vector Search Results (semantic retrieval)
 ${context || "No vector search results for this query."}
@@ -326,6 +362,12 @@ This is NON-NEGOTIABLE. Every quote from evidence MUST be cited with the [📄 f
     console.error('POST /api/chat error:', error);
     return NextResponse.json({ error: 'Failed to process message' }, { status: 500 });
   }
+}
+
+function jsonTryParse(val: any, fallback: any) {
+  if (Array.isArray(val)) return val;
+  if (!val) return fallback;
+  try { return JSON.parse(val); } catch { return fallback; }
 }
 
 function generateMockResponse(message: string, context: string): string {

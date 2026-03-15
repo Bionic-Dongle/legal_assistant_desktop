@@ -4,9 +4,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
-import { Send, Loader2, Save, Copy } from 'lucide-react';
+import { Send, Loader2, Save, Scale, ChevronRight, ChevronLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { DocumentViewerModal } from './DocumentViewerModal';
+import { CaseTheoryPanel } from './CaseTheoryPanel';
 
 interface Message {
   id: string;
@@ -236,9 +237,10 @@ export function ChatTab({ caseId }: { caseId: string }) {
   };
 
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(true);
 
   return (
-    <div className="flex flex-col h-full relative">
+    <div className="flex h-full relative overflow-hidden">
       {showSaveModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
           <div className="bg-muted p-6 rounded-xl border border-border w-full max-w-md space-y-4">
@@ -292,6 +294,8 @@ export function ChatTab({ caseId }: { caseId: string }) {
           </div>
         </div>
       )}
+      {/* ── Left: chat column ── */}
+      <div className="flex flex-col flex-1 min-w-0">
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {messages?.map?.((msg) => (
           <div
@@ -419,6 +423,23 @@ export function ChatTab({ caseId }: { caseId: string }) {
           </Button>
         </div>
       </div>
+
+      </div>{/* end left chat column */}
+
+      {/* ── Right: Case Theory Panel ── */}
+      <div className={`flex-shrink-0 border-l border-border/60 flex flex-col transition-all duration-200 ${panelOpen ? 'w-80' : 'w-0 overflow-hidden'}`}>
+        {panelOpen && <CaseTheoryPanel caseId={caseId} />}
+      </div>
+
+      {/* Toggle button — sits on the border between chat and panel */}
+      <button
+        className="absolute right-0 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center w-5 h-10 rounded-l bg-muted border border-r-0 border-border/60 hover:bg-muted/80 transition-colors"
+        style={{ right: panelOpen ? '320px' : '0px' }}
+        onClick={() => setPanelOpen(v => !v)}
+        title={panelOpen ? 'Hide Case Theory panel' : 'Show Case Theory panel'}
+      >
+        {panelOpen ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
+      </button>
 
       {/* Document Viewer Modal */}
       <DocumentViewerModal

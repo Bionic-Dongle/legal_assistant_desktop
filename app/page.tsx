@@ -10,8 +10,9 @@ import { EvidenceTab } from '@/components/EvidenceTab';
 import { InsightsTab } from '@/components/InsightsTab';
 import { SettingsTab } from '@/components/SettingsTab';
 import { NarrativeConstructionTab } from '@/components/NarrativeConstructionTab';
-import { MessageSquare, FileText, Lightbulb, Scale, CheckSquare, Database, Settings, FolderOpen, ChevronDown, Briefcase, Hammer, Wrench } from 'lucide-react';
+import { MessageSquare, FileText, Lightbulb, Scale, CheckSquare, Database, Settings, FolderOpen, ChevronDown, Briefcase, Hammer, Wrench, Shield } from 'lucide-react';
 import { ChatRepositoryTab } from '@/components/ChatRepositoryTab';
+import { cn } from '@/lib/utils';
 
 export default function Home() {
   const [caseId, setCaseId] = useState('');
@@ -23,28 +24,51 @@ export default function Home() {
   }, []);
 
   const initializeApp = async () => {
-    // Get first case ID
     const res = await fetch('/api/cases');
     const data = await res.json();
     setCaseId(data?.cases?.[0]?.id ?? '');
 
-    // Check baserow setting
     const settingsRes = await fetch('/api/settings');
     const settingsData = await settingsRes.json();
     setBaserowEnabled(settingsData?.baserow_enabled === 'true');
   };
 
+  const workspaceTabs = ['chat', 'narrative', 'repository'];
+  const materialsTabs = ['evidence', 'insights', 'arguments'];
+  const utilitiesTabs = ['todos', 'settings', 'baserow'];
+
+  const activeSection =
+    workspaceTabs.includes(activeTab) ? 'workspace' :
+    materialsTabs.includes(activeTab) ? 'materials' :
+    'utilities';
+
   return (
     <div className="h-screen flex flex-col bg-background">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <TabsList className="w-full rounded-none justify-start">
-          {/* Workspace Dropdown */}
+
+        {/* ── Nav bar ── */}
+        <TabsList className="w-full rounded-none justify-start gap-0 px-0 h-auto">
+
+          {/* Brand title */}
+          <div className="flex items-center px-4 pr-6 border-r border-border h-full shrink-0">
+            <span className="title-gradient text-sm font-bold tracking-[0.15em] uppercase select-none">
+              LegalMind
+            </span>
+          </div>
+
+          {/* Workspace */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="gap-2 px-6 py-2 h-auto">
-                <Hammer className="w-4 h-4" />
+              <Button
+                variant="ghost"
+                className={cn(
+                  "gap-2 px-5 py-3 h-auto rounded-none text-sm tracking-wide border-b-2 border-transparent transition-all",
+                  activeSection === 'workspace' && "nav-active"
+                )}
+              >
+                <Hammer className="w-3.5 h-3.5" />
                 Workspace
-                <ChevronDown className="w-3 h-3" />
+                <ChevronDown className="w-3 h-3 opacity-60" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
@@ -63,13 +87,19 @@ export default function Home() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Case Materials Dropdown */}
+          {/* Case Materials */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="gap-2 px-6 py-2 h-auto">
-                <Briefcase className="w-4 h-4" />
+              <Button
+                variant="ghost"
+                className={cn(
+                  "gap-2 px-5 py-3 h-auto rounded-none text-sm tracking-wide border-b-2 border-transparent transition-all",
+                  activeSection === 'materials' && "nav-active"
+                )}
+              >
+                <Briefcase className="w-3.5 h-3.5" />
                 Case Materials
-                <ChevronDown className="w-3 h-3" />
+                <ChevronDown className="w-3 h-3 opacity-60" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
@@ -88,13 +118,19 @@ export default function Home() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Utilities Dropdown */}
+          {/* Utilities */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="gap-2 px-6 py-2 h-auto">
-                <Wrench className="w-4 h-4" />
+              <Button
+                variant="ghost"
+                className={cn(
+                  "gap-2 px-5 py-3 h-auto rounded-none text-sm tracking-wide border-b-2 border-transparent transition-all",
+                  activeSection === 'utilities' && "nav-active"
+                )}
+              >
+                <Wrench className="w-3.5 h-3.5" />
                 Utilities
-                <ChevronDown className="w-3 h-3" />
+                <ChevronDown className="w-3 h-3 opacity-60" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
@@ -114,8 +150,20 @@ export default function Home() {
               )}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Status badge */}
+          <div className="flex items-center px-4 gap-2 shrink-0">
+            <Shield className="w-3 h-3 text-neon-green" />
+            <span className="text-xs tracking-widest uppercase font-mono badge-green px-2 py-0.5 rounded-sm">
+              Local // Secure
+            </span>
+          </div>
         </TabsList>
 
+        {/* ── Tab content ── */}
         <div className="flex-1 overflow-hidden">
           <TabsContent value="chat" className="h-full m-0">
             <ChatTab caseId={caseId} />
