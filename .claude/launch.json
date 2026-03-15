@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "LegalMind Dev",
+      "runtimeExecutable": "C:\\Users\\chipp\\AppData\\Roaming\\npm\\yarn.cmd",
+      "runtimeArgs": ["dev"],
+      "port": 3004,
+      "autoPort": true
+    }
+  ]
+}

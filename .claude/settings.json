@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(**)",
+      "Glob(**)",
+      "Grep(**)",
+      "Write(**)",
+      "Edit(**)",
+      "MultiEdit(**)",
+      "TodoWrite",
+      "TodoRead",
+      "WebFetch(*)",
+      "mcp__Desktop_Commander__read_file(*)",
+      "mcp__Desktop_Commander__list_directory(*)",
+      "mcp__Desktop_Commander__get_file_info(*)"
+    ],
+    "deny": []
+  }
+}

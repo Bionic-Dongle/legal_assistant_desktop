@@ -4,7 +4,7 @@ const fs = require("fs");
 
 // Always load .env from AppData — same location dev and production use
 const appDataEnvPath = path.join(os.homedir(), "AppData", "Roaming", "LegalMind", ".env");
-require("dotenv").config({ path: appDataEnvPath });
+try { require("dotenv").config({ path: appDataEnvPath }); } catch (e) { /* dotenv optional */ }
 
 const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
 
