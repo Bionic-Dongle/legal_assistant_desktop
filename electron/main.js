@@ -4,7 +4,13 @@ const fs = require("fs");
 
 // Always load .env from AppData — same location dev and production use
 const appDataEnvPath = path.join(os.homedir(), "AppData", "Roaming", "LegalMind", ".env");
-try { require("dotenv").config({ path: appDataEnvPath }); } catch (e) { /* dotenv optional */ }
+try {
+  const envContent = fs.readFileSync(appDataEnvPath, "utf-8");
+  for (const line of envContent.split("\n")) {
+    const match = line.match(/^\s*([^#=\s][^=]*?)\s*=\s*(.*?)\s*$/);
+    if (match) process.env[match[1]] = match[2].replace(/^["']|["']$/g, "");
+  }
+} catch (e) { /* .env optional */ }
 
 const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
 
@@ -130,6 +136,13 @@ async function createWindow() {
 
     // Show menu at cursor position
     menu.popup();
+  });
+
+  // F12 opens dev tools (useful for debugging production builds)
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'F12') {
+      mainWindow.webContents.toggleDevTools();
+    }
   });
 
   mainWindow.on("closed", () => {

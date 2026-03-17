@@ -186,24 +186,30 @@ These are not code changes — they're how we work together going forward:
 
 ---
 
+---
+
+## What Was Fixed This Session (2026-03-17)
+
+20. **ASAR native module crash — all API routes returning 500 HTML** — Every single API
+    route (`/api/chat`, `/api/settings`, `/api/cases`, etc.) was returning an HTML 500
+    error page instead of JSON. Root cause: Electron Builder packs everything into an
+    ASAR archive by default, but Node.js cannot load native `.node` addons from inside
+    an ASAR. `better-sqlite3` is a native addon. So every route that imported `db` was
+    crashing at module load time before any handler code ran.
+    - Fixed by adding `asarUnpack` to the electron-builder config in `package.json`
+    - Unpacked: `better-sqlite3`, `bindings`, `file-uri-to-path` (the three packages
+      that make up the native module load chain)
+    - electron-builder now also runs `@electron/rebuild` automatically (visible in build
+      log: "executing @electron/rebuild → preparing better-sqlite3 → finished")
+    - Deleted stale `main.js` from project root (old dotenv version, left over from a
+      previous session, was not used but was confusing)
+    - Clean build + reinstall completed successfully
+
+---
+
 ## Immediate Next Steps (do these first next session)
 
-### 0. Package the app — KNOWN ISSUE with dotenv
-
-**Problem:** The installed app crashes on launch with `Cannot find module 'dotenv'`.
-The fix was applied to `electron/main.js` (try/catch around the dotenv require) but the
-installer is still packaging an old cached version of main.js.
-
-**What to do next session:**
-1. Delete the old dist folder first: `rm -rf dist`
-2. Also delete the cached Next.js build: `rm -rf .next`
-3. Run: `yarn package`
-4. Installer will be at: `dist\LegalMind Setup 1.0.0.exe`
-5. If Windows SmartScreen appears: click "More info" → "Run anyway"
-
-**Why this happens:** dotenv is used in `electron/main.js` but wasn't in `yarn.lock`
-so electron-builder didn't bundle it. Fix is the try/catch already in main.js —
-just needs a clean rebuild to take effect.
+### 0. ✅ App is packaged and installed — DONE
 
 ### 1. GDrive evidence run (Cowork is now replaced — use the Scan Folders button)
 This is the big ingestion run. Everything is ready — just needs the files on disk.

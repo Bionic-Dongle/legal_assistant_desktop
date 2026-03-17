@@ -222,9 +222,9 @@ export function CaseTheoryPanel({ caseId }: { caseId: string }) {
     }
   }, [caseId]);
 
-  // Auto-run on mount (no AustLII — fast)
+  // Auto-run when we have a caseId (no AustLII — fast)
   useEffect(() => {
-    runAnalysis(false);
+    if (caseId) runAnalysis(false);
   }, [caseId]);
 
   const frameworkMap = new Map(analysis?.frameworks?.map(f => [f.framework_id, f]) ?? []);
